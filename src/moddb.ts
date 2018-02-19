@@ -318,6 +318,10 @@ class ModDB {
       return 'skyrimspecialedition';
     } else if (input === 'falloutnv') {
       return 'newvegas';
+    } else if (input === 'fallout4vr') {
+      return 'fallout4';
+    } else if (input === 'teso') {
+      return 'elderscrollsonline';
     } else {
       return input;
     }

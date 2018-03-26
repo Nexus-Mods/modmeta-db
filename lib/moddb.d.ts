@@ -1,3 +1,4 @@
+/// <reference types="bluebird" />
 import * as Promise from 'bluebird';
 import { ILookupResult, IModInfo } from './types';
 export interface IServer {
@@ -17,6 +18,7 @@ declare class ModDB {
     private mGameId;
     private mBlacklist;
     private mLog;
+    private mNexusQuota;
     constructor(dbName: string, gameId: string, servers: IServer[], log?: LogFunc, database?: any, timeoutMS?: number);
     close(): Promise<void>;
     setGameId(gameId: string): void;

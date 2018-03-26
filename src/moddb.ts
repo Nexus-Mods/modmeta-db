@@ -4,6 +4,8 @@ import * as minimatch from 'minimatch';
 import * as restT from 'node-rest-client';
 import * as semvish from 'semvish';
 
+import Quota from './Quota';
+import { QUOTA_MAX, QUOTA_RATE_MS } from './nexusParams';
 import {IHashResult, IIndexResult, ILookupResult, IModInfo} from './types';
 import {genHash} from './util';
 
@@ -59,6 +61,7 @@ class ModDB {
   private mGameId: string;
   private mBlacklist: Set<string> = new Set();
   private mLog: LogFunc;
+  private mNexusQuota: Quota;
 
   /**
    * constructor
@@ -93,6 +96,7 @@ class ModDB {
     this.mServers = servers;
     this.mTimeout = timeoutMS;
     this.mLog = log || (() => undefined);
+    this.mNexusQuota = new Quota(QUOTA_MAX, QUOTA_MAX, QUOTA_RATE_MS);
 
     this.promisify();
   }
@@ -270,34 +274,36 @@ class ModDB {
     const realGameId = this.translateNexusGameId(gameId || this.mGameId);
 
     const url = `${server.url}/games/${realGameId}/mods/md5_search/${hash}`;
-    return new Promise<ILookupResult[]>((resolve, reject) => {
-      try {
-        const request = this.mRestClient.get(
-            url, this.nexusBaseData(server), (data, response) => {
-              if (response.statusCode === 200) {
-                const result: ILookupResult[] =
-                    data.map((nexusObj: any) =>
-                                 this.translateFromNexus(nexusObj, gameId));
-                // and return to caller
-                resolve(result);
-              } else if (response.statusCode === 521) {
-                reject(new Error('API offline'));
-                // data contains an html page from cloudflare -> useless
-              } else {
-                // TODO not sure what data contains at this point. If the api is working
-                // correct it _should_ be a json object containing an error message
-                reject(new Error(util.inspect(data)));
-              }
-            });
-        request.on('requestTimeout', () => reject(new Error('request timeout')));
-        request.on('responseTimeout', () => reject(new Error('response timeout')));
-        request.on('error', (err) => {
+
+    return this.mNexusQuota.wait()
+      .then(() => new Promise<ILookupResult[]>((resolve, reject) => {
+        try {
+          const request = this.mRestClient.get(
+              url, this.nexusBaseData(server), (data, response) => {
+                if (response.statusCode === 200) {
+                  const result: ILookupResult[] =
+                      data.map((nexusObj: any) =>
+                                  this.translateFromNexus(nexusObj, gameId));
+                  // and return to caller
+                  resolve(result);
+                } else if (response.statusCode === 521) {
+                  reject(new Error('API offline'));
+                  // data contains an html page from cloudflare -> useless
+                } else {
+                  // TODO not sure what data contains at this point. If the api is working
+                  // correct it _should_ be a json object containing an error message
+                  reject(new Error(util.inspect(data)));
+                }
+              });
+          request.on('requestTimeout', () => reject(new Error('request timeout')));
+          request.on('responseTimeout', () => reject(new Error('response timeout')));
+          request.on('error', (err) => {
+            reject(err);
+          });
+        } catch (err) {
           reject(err);
-        });
-      } catch (err) {
-        reject(err);
-      }
-    });
+        }
+      }));
   }
 
   private queryServerHashMeta(server: IServer, hash: string): Promise<ILookupResult[]> {

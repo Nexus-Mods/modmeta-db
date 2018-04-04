@@ -36,6 +36,7 @@ declare class ModDB {
     private translateNexusGameId(input);
     private translateFromNexus;
     private readRange<T>(type, key, terminate?);
+    private cacheResults(results, lifeTime);
     private getAllByKey(key, gameId);
     private resolveIndex(key);
     private getAllByLogicalName(logicalName, versionMatch);

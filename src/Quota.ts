@@ -12,8 +12,13 @@ class Quota {
     this.mMSPerIncrement = msPerIncrement;
   }
 
+  public reset() {
+    this.mCount = 0;
+    this.mLastCheck = Date.now();
+  }
+
   public wait(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       const now = Date.now();
       const recovered = Math.floor((now - this.mLastCheck) / this.mMSPerIncrement);
       this.mCount = Math.min(this.mCount + recovered, this.mMaximum);

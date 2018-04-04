@@ -2,6 +2,7 @@ import * as Promise from 'bluebird';
 import levelup = require('levelup');
 import * as minimatch from 'minimatch';
 import * as restT from 'node-rest-client';
+import * as path from 'path';
 import * as semvish from 'semvish';
 
 import Quota from './Quota';
@@ -214,7 +215,21 @@ class ModDB {
           lookupKey += ':' + gameId;
         }
       }
-      return this.getAllByKey(lookupKey, gameId);
+      return this.getAllByKey(lookupKey, gameId)
+        .tap(result => {
+          // if the result is empty, put whatever we know in the cache,
+          // just to avoid re-querying the server
+          if (result.length === 0) {
+            this.insert({
+              fileMD5: hashResult,
+              fileName: filePath !== undefined ? path.basename(filePath) : undefined,
+              fileSizeBytes: hashFileSize,
+              fileVersion: '',
+              gameId,
+              sourceURI: '',
+            });
+          }
+        });
     });
   }
 
@@ -289,6 +304,12 @@ class ModDB {
                 } else if (response.statusCode === 521) {
                   reject(new Error('API offline'));
                   // data contains an html page from cloudflare -> useless
+                } else if (response.statusCode === 429) {
+                  this.mNexusQuota.reset();
+                  setTimeout(() => {
+                    resolve(this.mNexusQuota.wait()
+                      .then(() => this.queryServerHashNexus(server, gameId, hash)));
+                  }, 1000);
                 } else {
                   // TODO not sure what data contains at this point. If the api is working
                   // correct it _should_ be a json object containing an error message
@@ -321,6 +342,8 @@ class ModDB {
 
   private translateNexusGameId(input: string): string {
     if (input === 'skyrimse') {
+      return 'skyrimspecialedition';
+    } else if (input === 'skyrimvr') {
       return 'skyrimspecialedition';
     } else if (input === 'falloutnv') {
       return 'newvegas';
@@ -399,6 +422,18 @@ class ModDB {
     });
   }
 
+  private cacheResults(results: ILookupResult[], lifeTime: number) {
+    // cache all results in our database
+    for (const result of results) {
+      // TODO: cached results currently don't expire
+      /*
+      const temp = { ...result.value };
+      temp.expires = new Date().getTime() / 1000 + lifeTime;
+      */
+      this.insert(result.value);
+    }
+  }
+
   private getAllByKey(key: string, gameId: string): Promise<ILookupResult[]> {
     if (this.mBlacklist.has(JSON.stringify({ key, gameId }))) {
       // avoid querying the same keys again and again
@@ -415,27 +450,23 @@ class ModDB {
           let remoteResults: ILookupResult[];
 
           return Promise.mapSeries(this.mServers, (server: IServer) => {
-                          if (remoteResults) {
-                            return Promise.resolve();
-                          }
-                          return this.queryServerHash(server, gameId, hash)
-                              .then((serverResults: ILookupResult[]) => {
-                                remoteResults = serverResults;
-                                // cache all results in our database
-                                for (const result of remoteResults) {
-                                  const temp = { ...result.value };
-                                  temp.expires = new Date().getTime() / 1000 +
-                                                 server.cacheDurationSec;
-                                  this.insert(result.value);
-                                }
-                              })
-                              .catch(err => {
-                                this.mLog('warn', 'failed to query by key', {
-                                  server: server.url, key, gameId, error: err.message.toString(),
-                                });
-                                this.mBlacklist.add(JSON.stringify({ key, gameId }));
-                              });
-                        }).then(() => Promise.resolve(remoteResults || []));
+            if (remoteResults && (remoteResults.length > 0)) {
+              // only use the results from the first server that had anything
+              return Promise.resolve();
+            }
+            return this.queryServerHash(server, gameId, hash)
+                .then((serverResults: ILookupResult[]) => {
+                  remoteResults = serverResults;
+                  this.cacheResults(remoteResults, server.cacheDurationSec);
+                })
+                .catch(err => {
+                  this.mLog('warn', 'failed to query by key', {
+                    server: server.url, key, gameId, error: err.message.toString(),
+                  });
+                  this.mBlacklist.add(JSON.stringify({ key, gameId }));
+                });
+          })
+          .then(() => Promise.resolve(remoteResults || []));
         });
   }
 
@@ -469,29 +500,23 @@ class ModDB {
           let remoteResults: ILookupResult[];
 
           return Promise.mapSeries(this.mServers, (server: IServer) => {
-                          if (remoteResults) {
-                            return Promise.resolve();
-                          }
-                          return this.queryServerLogical(server, logicalName,
-                                                         versionMatch)
-                              .then((serverResults: ILookupResult[]) => {
-                                remoteResults = serverResults;
-                                // cache all results in our database
-                                for (const result of remoteResults) {
-                                  const temp = { ...result.value };
-                                  temp.expires = new Date().getTime() / 1000 +
-                                                 server.cacheDurationSec;
-                                  this.insert(result.value);
-                                }
-                              })
-                              .catch(err => {
-                                this.mLog('warn', 'failed to query by logical name', {
-                                  server: server.url, logicalName, versionMatch,
-                                  error: err.message.toString(),
-                                });
-                                this.mBlacklist.add(JSON.stringify({ logicalName, versionMatch }));
-                              });
-                        }).then(() => Promise.resolve(remoteResults || []));
+            if (remoteResults) {
+              return Promise.resolve();
+            }
+            return this.queryServerLogical(server, logicalName,
+                                            versionMatch)
+                .then((serverResults: ILookupResult[]) => {
+                  remoteResults = serverResults;
+                  this.cacheResults(remoteResults, server.cacheDurationSec);
+                })
+                .catch(err => {
+                  this.mLog('warn', 'failed to query by logical name', {
+                    server: server.url, logicalName, versionMatch,
+                    error: err.message.toString(),
+                  });
+                  this.mBlacklist.add(JSON.stringify({ logicalName, versionMatch }));
+                });
+          }).then(() => Promise.resolve(remoteResults || []));
         });
   }
 
@@ -520,29 +545,23 @@ class ModDB {
           let remoteResults: ILookupResult[];
 
           return Promise.mapSeries(this.mServers, (server: IServer) => {
-                          if (remoteResults) {
-                            return Promise.resolve();
-                          }
-                          return this.queryServerLogical(server, expression,
-                                                         versionMatch)
-                              .then((serverResults: ILookupResult[]) => {
-                                remoteResults = serverResults;
-                                // cache all results in our database
-                                for (const result of remoteResults) {
-                                  const temp = { ...result.value };
-                                  temp.expires = new Date().getTime() / 1000 +
-                                                 server.cacheDurationSec;
-                                  this.insert(result.value);
-                                }
-                              })
-                              .catch(err => {
-                                this.mLog('warn', 'failed to query by expression', {
-                                  server: server.url, expression, versionMatch,
-                                  error: err.message.toString(),
-                                });
-                                this.mBlacklist.add(JSON.stringify({ expression, versionMatch }));
-                              });
-                        }).then(() => Promise.resolve(remoteResults || []));
+            if (remoteResults) {
+              return Promise.resolve();
+            }
+            return this.queryServerLogical(server, expression,
+                                            versionMatch)
+                .then((serverResults: ILookupResult[]) => {
+                  remoteResults = serverResults;
+                  this.cacheResults(remoteResults, server.cacheDurationSec);
+                })
+                .catch(err => {
+                  this.mLog('warn', 'failed to query by expression', {
+                    server: server.url, expression, versionMatch,
+                    error: err.message.toString(),
+                  });
+                  this.mBlacklist.add(JSON.stringify({ expression, versionMatch }));
+                });
+          }).then(() => Promise.resolve(remoteResults || []));
         });
   }
 

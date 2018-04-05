@@ -137,6 +137,11 @@ class ModDB {
    * @memberOf ModDB
    */
   public getByKey(key: string): Promise<ILookupResult[]> {
+    if (this.mDB.isClosed()) {
+      // database already closed
+      return Promise.resolve([]);
+    }
+
     return this.getAllByKey(key, this.mGameId);
   }
 
@@ -144,10 +149,20 @@ class ModDB {
    * retrieve mods by their logical name and version
    */
   public getByLogicalName(logicalName: string, versionMatch: string): Promise<ILookupResult[]> {
+    if (this.mDB.isClosed()) {
+      // database already closed
+      return Promise.resolve([]);
+    }
+
     return this.getAllByLogicalName(logicalName, versionMatch);
   }
 
   public getByExpression(expression: string, versionMatch: string): Promise<ILookupResult[]> {
+    if (this.mDB.isClosed()) {
+      // database already closed
+      return Promise.resolve([]);
+    }
+
     return this.getAllByExpression(expression, versionMatch);
   }
 

@@ -331,9 +331,13 @@ class ModDB {
                   reject(new Error(util.inspect(data)));
                 }
               });
-          request.on('requestTimeout', () => reject(new Error('request timeout')));
+          request.on('requestTimeout', () => {
+            reject(new Error('request timeout'));
+            request.abort();
+          });
           request.on('responseTimeout', () => reject(new Error('response timeout')));
           request.on('error', (err) => {
+            request.abort();
             reject(err);
           });
         } catch (err) {

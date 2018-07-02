@@ -13,7 +13,6 @@ declare class ModDB {
     private mDB;
     private mServers;
     private mModKeys;
-    private mRestClient;
     private mTimeout;
     private mGameId;
     private mBlacklist;
@@ -27,8 +26,7 @@ declare class ModDB {
     getByExpression(expression: string, versionMatch: string): Promise<ILookupResult[]>;
     insert(mod: IModInfo): Promise<void>;
     lookup(filePath?: string, fileMD5?: string, fileSize?: number, gameId?: string): Promise<ILookupResult[]>;
-    private restBaseData(server);
-    private nexusBaseData(server);
+    private restGet(urlString, addHeaders?);
     private queryServerLogical(server, logicalName, versionMatch);
     private queryServerHash(server, gameId, hash);
     private queryServerHashNexus(server, gameId, hash);

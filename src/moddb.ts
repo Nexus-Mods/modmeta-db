@@ -1,33 +1,21 @@
 import * as Promise from 'bluebird';
 import levelup = require('levelup');
 import * as minimatch from 'minimatch';
-import * as restT from 'node-rest-client';
+
+import * as http from 'http';
+import * as https from 'https';
 import * as path from 'path';
 import * as semvish from 'semvish';
+import * as url from 'url';
 
 import Quota from './Quota';
 import { QUOTA_MAX, QUOTA_RATE_MS } from './nexusParams';
 import {IHashResult, IIndexResult, ILookupResult, IModInfo} from './types';
 import {genHash} from './util';
 
-import * as util from 'util';
-
 interface ILevelUpAsync extends LevelUp {
   getAsync?: (key: string) => Promise<any>;
   putAsync?: (key: string, data: any) => Promise<void>;
-}
-
-interface IRequestArgs {
-  headers?: any;
-  path?: any;
-  data?: any;
-  requestConfig?: {
-    timeout: number,
-    noDelay: boolean,
-  };
-  responseConfig?: {
-    timeout: number,
-  };
 }
 
 export interface IServer {
@@ -37,16 +25,29 @@ export interface IServer {
   cacheDurationSec: number;
 }
 
-interface IBlacklistEntry {
-  key?: string;
-  logicalName?: string;
-  expression?: string;
-  versionMatch?: string;
-  gameId?: string;
-}
-
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 export type LogFunc = (level: LogLevel, message: string, extra?: any) => void;
+
+// interface compatible with http and https module
+interface IHTTP {
+  request: (options: https.RequestOptions | string | URL,
+            callback?: (res: http.IncomingMessage) => void) => http.ClientRequest;
+  Agent: typeof http.Agent;
+}
+
+class HTTPError extends Error {
+  private mCode: number;
+
+  constructor(code: number, message: string) {
+    super(message);
+    this.name = this.constructor.name;
+    this.mCode = code;
+  }
+
+  public get code() {
+    return this.mCode;
+  }
+}
 
 /**
  * The primary database interface.
@@ -57,7 +58,6 @@ class ModDB {
   private mDB: ILevelUpAsync;
   private mServers: IServer[];
   private mModKeys: string[];
-  private mRestClient: restT.Client;
   private mTimeout: number;
   private mGameId: string;
   private mBlacklist: Set<string> = new Set();
@@ -92,8 +92,6 @@ class ModDB {
     ];
 
     this.mGameId = gameId;
-    const { Client } = require('node-rest-client') as typeof restT;
-    this.mRestClient = new Client();
     this.mServers = servers;
     this.mTimeout = timeoutMS;
     this.mLog = log || (() => undefined);
@@ -248,27 +246,46 @@ class ModDB {
     });
   }
 
-  private restBaseData(server: IServer): IRequestArgs {
-    return {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      path: {
-      },
-      requestConfig: {
+  private restGet(urlString: string, addHeaders: any = {}): Promise<any> {
+    const parsed = url.parse(urlString);
+    const lib: IHTTP = parsed.protocol === 'https:' ? https : http;
+    return new Promise<any>((resolve, reject) => {
+      const params: http.RequestOptions = {
+        method: 'GET',
+        protocol: parsed.protocol,
+        port: parsed.port,
+        hostname: parsed.hostname,
+        path: parsed.path,
+        headers: {
+          'Content-Type': 'application/json',
+          ...addHeaders
+        },
         timeout: this.mTimeout || 5000,
-        noDelay: true,
-      },
-      responseConfig: {
-        timeout: this.mTimeout || 5000,
-      },
-    };
-  }
+        agent: new lib.Agent(),
+      };
+      lib.request(params, (res: http.IncomingMessage) => {
+        if (res.statusCode === 200) {
+          res.setEncoding('utf8');
+          let data = '';
+          res
+            .on('data', buf => data += buf)
+            .on('end', () => {
+              try {
+                resolve(JSON.parse(data));
+              } catch (err) {
+                reject(new Error('Invalid response: ' + err.message));
+              }
+            });
 
-  private nexusBaseData(server: IServer): IRequestArgs {
-    const res = this.restBaseData(server);
-    res.headers.APIKEY = server.apiKey;
-    return res;
+        } else {
+          reject(new HTTPError(res.statusCode, res.statusMessage));
+        }
+      })
+      .on('error', err => {
+        reject(err);
+      })
+      .end();
+    });
   }
 
   private queryServerLogical(server: IServer, logicalName: string,
@@ -279,15 +296,7 @@ class ModDB {
     }
 
     const url = `${server.url}/by_name/${logicalName}/versionMatch`;
-    return new Promise<ILookupResult[]>((resolve, reject) => {
-      this.mRestClient.get(url, this.restBaseData(server), (data, response) => {
-        if (response.statusCode === 200) {
-          resolve(data);
-        } else {
-          reject(new Error(util.inspect(data)));
-        }
-      });
-    });
+    return this.restGet(url);
   }
 
   private queryServerHash(server: IServer, gameId: string, hash: string): Promise<ILookupResult[]> {
@@ -306,57 +315,27 @@ class ModDB {
     const url = `${server.url}/games/${realGameId}/mods/md5_search/${hash}`;
 
     return this.mNexusQuota.wait()
-      .then(() => new Promise<ILookupResult[]>((resolve, reject) => {
-        try {
-          const request = this.mRestClient.get(
-              url, this.nexusBaseData(server), (data, response) => {
-                if (response.statusCode === 200) {
-                  const result: ILookupResult[] =
-                      data.map((nexusObj: any) =>
-                                  this.translateFromNexus(nexusObj, gameId));
-                  // and return to caller
-                  resolve(result);
-                } else if (response.statusCode === 521) {
-                  reject(new Error('API offline'));
-                  // data contains an html page from cloudflare -> useless
-                } else if (response.statusCode === 429) {
-                  this.mNexusQuota.reset();
-                  setTimeout(() => {
-                    resolve(this.mNexusQuota.wait()
-                      .then(() => this.queryServerHashNexus(server, gameId, hash)));
-                  }, 1000);
-                } else {
-                  // TODO not sure what data contains at this point. If the api is working
-                  // correct it _should_ be a json object containing an error message
-                  reject(new Error(util.inspect(data)));
-                }
-              });
-          request.on('requestTimeout', () => {
-            reject(new Error('request timeout'));
-            request.abort();
-          });
-          request.on('responseTimeout', () => reject(new Error('response timeout')));
-          request.on('error', (err) => {
-            request.abort();
-            reject(err);
-          });
-        } catch (err) {
-          reject(err);
+      .then(() => this.restGet(url, { APIKEY: server.apiKey }))
+      .then(nexusData => nexusData.map(nexusObj => this.translateFromNexus(nexusObj, gameId)))
+      .catch(HTTPError, err => {
+        if (err.code === 521) {
+          return Promise.reject(new Error('API offline'));
+        } else if (err.code === 429) {
+          this.mNexusQuota.reset();
+          return Promise.delay(1000)
+            .then(() => this.mNexusQuota.wait())
+            .then(() => this.queryServerHashNexus(server, gameId, hash));
+        } else {
+          // TODO not sure what data contains at this point. If the api is working
+          // correct it _should_ be a json object containing an error message
+          return err;
         }
-      }));
+      });
   }
 
   private queryServerHashMeta(server: IServer, hash: string): Promise<ILookupResult[]> {
     const url = `${server.url}/by_hash/${hash}`;
-    return new Promise<ILookupResult[]>((resolve, reject) => {
-      this.mRestClient.get(url, this.restBaseData(server), (data, response) => {
-        if (response.statusCode === 200) {
-          resolve(data);
-        } else {
-          reject(new Error(util.inspect(data)));
-        }
-      });
-    });
+    return this.restGet(url);
   }
 
   private translateNexusGameId(input: string): string {

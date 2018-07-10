@@ -397,6 +397,10 @@ class ModDB {
 
   private readRange<T>(type: 'hash' | 'log' | 'name', key: string,
                        terminate: boolean = true): Promise<T[]> {
+    if (this.mDB.isClosed()) {
+      return Promise.resolve([]);
+    }
+
     return new Promise<T[]>((resolve, reject) => {
       const result: T[] = [];
 
@@ -420,16 +424,21 @@ class ModDB {
     });
   }
 
-  private cacheResults(results: ILookupResult[], lifeTime: number) {
+  private cacheResults(results: ILookupResult[], lifeTime: number): Promise<void> {
+    if (this.mDB.isClosed()) {
+      return Promise.resolve();
+    }
+
     // cache all results in our database
-    for (const result of results) {
+    return Promise.mapSeries(results, result => {
       // TODO: cached results currently don't expire
       /*
       const temp = { ...result.value };
       temp.expires = new Date().getTime() / 1000 + lifeTime;
       */
-      this.insert(result.value);
-    }
+      return this.insert(result.value);
+    })
+    .then(() => null);
   }
 
   private getAllByKey(key: string, gameId: string): Promise<ILookupResult[]> {
@@ -455,7 +464,7 @@ class ModDB {
             return this.queryServerHash(server, gameId, hash)
                 .then((serverResults: ILookupResult[]) => {
                   remoteResults = serverResults;
-                  this.cacheResults(remoteResults, server.cacheDurationSec);
+                  return this.cacheResults(remoteResults, server.cacheDurationSec);
                 })
                 .catch(err => {
                   this.mLog('warn', 'failed to query by key', {
@@ -505,7 +514,7 @@ class ModDB {
                                             versionMatch)
                 .then((serverResults: ILookupResult[]) => {
                   remoteResults = serverResults;
-                  this.cacheResults(remoteResults, server.cacheDurationSec);
+                  return this.cacheResults(remoteResults, server.cacheDurationSec);
                 })
                 .catch(err => {
                   this.mLog('warn', 'failed to query by logical name', {
@@ -550,7 +559,7 @@ class ModDB {
                                             versionMatch)
                 .then((serverResults: ILookupResult[]) => {
                   remoteResults = serverResults;
-                  this.cacheResults(remoteResults, server.cacheDurationSec);
+                  return this.cacheResults(remoteResults, server.cacheDurationSec);
                 })
                 .catch(err => {
                   this.mLog('warn', 'failed to query by expression', {

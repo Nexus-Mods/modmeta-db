@@ -50,6 +50,19 @@ class HTTPError extends Error {
 }
 
 /**
+ * test if the specified string is a valid (md5) hash
+ */
+function isMD5Hash(input: string): boolean {
+  if (input.length !== 32) {
+    return false;
+  }
+  if (input.search(/[^A-Fa-f0-9]/) !== -1) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * The primary database interface.
  * This allows queries about meta information regarding a file and
  * will relay them to a remote server if not found locally
@@ -300,6 +313,10 @@ class ModDB {
   }
 
   private queryServerHash(server: IServer, gameId: string, hash: string): Promise<ILookupResult[]> {
+    if (!isMD5Hash(hash)) {
+      // avoid querying a server with an invalid hash
+      return Promise.resolve([]);
+    }
     if (server.protocol === 'nexus') {
       return this.queryServerHashNexus(server, gameId, hash);
     } else {

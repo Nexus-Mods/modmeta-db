@@ -1,4 +1,3 @@
-/// <reference types="bluebird" />
 import * as Promise from 'bluebird';
 import { ILookupResult, IModInfo } from './types';
 export interface IServer {
@@ -18,7 +17,9 @@ declare class ModDB {
     private mBlacklist;
     private mLog;
     private mNexusQuota;
-    constructor(dbName: string, gameId: string, servers: IServer[], log?: LogFunc, database?: any, timeoutMS?: number);
+    static create(dbName: string, gameId: string, servers: IServer[], log?: LogFunc, database?: any, timeoutMS?: number): Promise<ModDB>;
+    constructor(gameId: string, servers: IServer[], log?: LogFunc, timeoutMS?: number);
+    connect(dbName: string, database: any): Promise<void>;
     close(): Promise<void>;
     setGameId(gameId: string): void;
     getByKey(key: string): Promise<ILookupResult[]>;
@@ -26,23 +27,23 @@ declare class ModDB {
     getByExpression(expression: string, versionMatch: string): Promise<ILookupResult[]>;
     insert(mod: IModInfo): Promise<void>;
     lookup(filePath?: string, fileMD5?: string, fileSize?: number, gameId?: string): Promise<ILookupResult[]>;
-    private restGet(urlString, addHeaders?);
-    private queryServerLogical(server, logicalName, versionMatch);
-    private queryServerHash(server, gameId, hash);
-    private queryServerHashNexus(server, gameId, hash);
-    private queryServerHashMeta(server, hash);
-    private translateNexusGameId(input);
+    private restGet;
+    private queryServerLogical;
+    private queryServerHash;
+    private queryServerHashNexus;
+    private queryServerHashMeta;
+    private translateNexusGameId;
     private translateFromNexus;
-    private readRange<T>(type, key, terminate?);
-    private cacheResults(results, lifeTime);
-    private getAllByKey(key, gameId);
-    private resolveIndex(key);
-    private getAllByLogicalName(logicalName, versionMatch);
-    private getAllByExpression(expression, versionMatch);
-    private makeKey(mod);
-    private makeNameLookup(mod);
-    private makeLogicalLookup(mod);
-    private missingKeys(mod);
-    private promisify();
+    private readRange;
+    private cacheResults;
+    private getAllByKey;
+    private resolveIndex;
+    private getAllByLogicalName;
+    private getAllByExpression;
+    private makeKey;
+    private makeNameLookup;
+    private makeLogicalLookup;
+    private missingKeys;
+    private promisify;
 }
 export default ModDB;

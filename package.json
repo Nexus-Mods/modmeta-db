@@ -1,6 +1,6 @@
 {
   "name": "modmeta-db",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Serves dependencies and other meta information for mod files.",
   "main": "lib/index.js",
   "scripts": {
@@ -29,7 +29,8 @@
     "@types/minimatch": "^2.0.29",
     "@types/serve-static": "^1.7.31",
     "fs-extra-promise": "^1.0.1",
-    "ts-node": "^3.0.2"
+    "ts-node": "^3.0.2",
+    "typescript": "^3.0.1"
   },
   "optionalDependencies": {
     "body-parser": "^1.15.2",

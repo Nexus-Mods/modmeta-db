@@ -77,6 +77,17 @@ class ModDB {
   private mLog: LogFunc;
   private mNexusQuota: Quota;
 
+  public static create(dbName: string,
+              gameId: string,
+              servers: IServer[],
+              log?: LogFunc,
+              database?: any,
+              timeoutMS?: number): Promise<ModDB> {
+    const res = new ModDB(gameId, servers, log, timeoutMS);
+    return res.connect(dbName, database)
+      .then(() => res);
+  }
+
   /**
    * constructor
    *
@@ -88,13 +99,10 @@ class ModDB {
    * @param {number} timeoutMS timeout in milliseconds for outgoing network requests.
    *                           defaults to 5 seconds
    */
-  constructor(dbName: string,
-              gameId: string,
+  constructor(gameId: string,
               servers: IServer[],
               log?: LogFunc,
-              database?: any,
               timeoutMS?: number) {
-    this.mDB = levelup(dbName, {valueEncoding: 'json', db: database});
     this.mModKeys = [
       'fileName',
       'fileVersion',
@@ -109,8 +117,22 @@ class ModDB {
     this.mTimeout = timeoutMS;
     this.mLog = log || (() => undefined);
     this.mNexusQuota = new Quota(QUOTA_MAX, QUOTA_MAX, QUOTA_RATE_MS);
+  }
 
-    this.promisify();
+  public connect(dbName: string, database: any): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      this.mDB = (levelup as any)(dbName, {valueEncoding: 'json', db: database}, (err, db) => {
+        if (err) {
+          reject(err);
+        } else {
+          this.mDB = db;
+          resolve();
+        }
+      });
+    })
+    .then(() => {
+      this.promisify();
+    });
   }
 
   /**

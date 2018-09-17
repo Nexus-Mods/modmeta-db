@@ -378,9 +378,7 @@ class ModDB {
   }
 
   private translateNexusGameId(input: string): string {
-    if (input === 'skyrimse') {
-      return 'skyrimspecialedition';
-    } else if (input === 'skyrimvr') {
+    if ((input === 'skyrimse') || (input === 'skyrimvr')) {
       return 'skyrimspecialedition';
     } else if (input === 'falloutnv') {
       return 'newvegas';
@@ -388,6 +386,8 @@ class ModDB {
       return 'fallout4';
     } else if (input === 'teso') {
       return 'elderscrollsonline';
+    } else if ((input === 'nwn') || (input === 'nwnee')) {
+      return 'neverwinter';
     } else {
       return input;
     }

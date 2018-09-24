@@ -364,6 +364,8 @@ class ModDB {
           return Promise.delay(1000)
             .then(() => this.mNexusQuota.wait())
             .then(() => this.queryServerHashNexus(server, gameId, hash));
+        } else if (err.code === 404) {
+          return Promise.resolve([]);
         } else {
           // TODO not sure what data contains at this point. If the api is working
           // correct it _should_ be a json object containing an error message

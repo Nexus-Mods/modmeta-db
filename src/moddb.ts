@@ -2,8 +2,10 @@ import * as Promise from 'bluebird';
 import levelup = require('levelup');
 import * as minimatch from 'minimatch';
 
+import * as encode from 'encoding-down';
 import * as http from 'http';
 import * as https from 'https';
+import * as leveldown from 'leveldown';
 import * as path from 'path';
 import * as semvish from 'semvish';
 import * as url from 'url';
@@ -13,7 +15,7 @@ import { QUOTA_MAX, QUOTA_RATE_MS } from './nexusParams';
 import {IHashResult, IIndexResult, ILookupResult, IModInfo} from './types';
 import {genHash} from './util';
 
-interface ILevelUpAsync extends LevelUp {
+interface ILevelUpAsync extends levelup.LevelUp {
   getAsync?: (key: string) => Promise<any>;
   putAsync?: (key: string, data: any) => Promise<void>;
 }
@@ -84,7 +86,7 @@ class ModDB {
               database?: any,
               timeoutMS?: number): Promise<ModDB> {
     const res = new ModDB(gameId, servers, log, timeoutMS);
-    return res.connect(dbName, database)
+    return res.connect(dbName, database || encode((leveldown as any)(dbName)))
       .then(() => res);
   }
 
@@ -121,7 +123,7 @@ class ModDB {
 
   public connect(dbName: string, database: any): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      this.mDB = (levelup as any)(dbName, {valueEncoding: 'json', db: database}, (err, db) => {
+      this.mDB = (levelup as any)(database, {keyEncoding: 'utf8', valueEncoding: 'utf8'}, (err, db) => {
         if (err) {
           reject(err);
         } else {

@@ -461,7 +461,10 @@ class ModDB {
         });
       }
 
-      stream.on('data', (data: T) => result.push(data));
+      stream.on('data', (data: {key: string, value: string}) => result.push({
+        key: data.key,
+        value: JSON.parse(data.value),
+      } as any));
       stream.on('error', (err) => reject(err));
       stream.on('end', () => resolve(result));
     });
@@ -522,11 +525,14 @@ class ModDB {
 
   private resolveIndex(key: string): Promise<ILookupResult> {
     return new Promise<ILookupResult>(
-        (resolve, reject) => this.mDB.get(key, (err, value) => {
+        (resolve, reject) => this.mDB.get(key, (err, data) => {
           if (err) {
             reject(err);
           } else {
-            resolve(value);
+            resolve({
+              key: data.key,
+              value: JSON.parse(data.value)
+            });
           }
         }));
   }

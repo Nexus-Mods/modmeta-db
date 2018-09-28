@@ -219,7 +219,7 @@ class ModDB {
 
     const key = this.makeKey(mod);
 
-    return this.mDB.putAsync(key, mod)
+    return this.mDB.putAsync(key, JSON.stringify(mod))
       .then(() => this.mDB.putAsync(this.makeNameLookup(mod), key))
       .then(() => this.mDB.putAsync(this.makeLogicalLookup(mod), key))
     ;

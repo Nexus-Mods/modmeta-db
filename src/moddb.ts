@@ -461,10 +461,16 @@ class ModDB {
         });
       }
 
-      stream.on('data', (data: {key: string, value: string}) => result.push({
-        key: data.key,
-        value: JSON.parse(data.value),
-      } as any));
+      stream.on('data', (data: {key: string, value: string}) => {
+        try {
+          result.push({
+            key: data.key,
+            value: JSON.parse(data.value),
+          } as any);
+        } catch (err) {
+          this.mLog('warn', 'Invalid data stored for', data.key);
+        }
+      });
       stream.on('error', (err) => reject(err));
       stream.on('end', () => resolve(result));
     });

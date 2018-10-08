@@ -217,6 +217,10 @@ class ModDB {
                                       missingKeys.join(', ')));
     }
 
+    if (this.mDB.isClosed())  {
+      return Promise.resolve();
+    }
+
     const key = this.makeKey(mod);
 
     return this.mDB.putAsync(key, JSON.stringify(mod))

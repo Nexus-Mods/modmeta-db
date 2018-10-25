@@ -45,5 +45,7 @@ declare class ModDB {
     private makeLogicalLookup;
     private missingKeys;
     private promisify;
+    private putSafe;
+    private getSafe;
 }
 export default ModDB;

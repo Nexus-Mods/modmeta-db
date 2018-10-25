@@ -217,15 +217,11 @@ class ModDB {
                                       missingKeys.join(', ')));
     }
 
-    if (this.mDB.isClosed())  {
-      return Promise.resolve();
-    }
-
     const key = this.makeKey(mod);
 
-    return this.mDB.putAsync(key, JSON.stringify(mod))
-      .then(() => this.mDB.putAsync(this.makeNameLookup(mod), key))
-      .then(() => this.mDB.putAsync(this.makeLogicalLookup(mod), key))
+    return this.putSafe(key, JSON.stringify(mod))
+      .then(() => this.putSafe(this.makeNameLookup(mod), key))
+      .then(() => this.putSafe(this.makeLogicalLookup(mod), key))
     ;
   }
 
@@ -534,17 +530,11 @@ class ModDB {
   }
 
   private resolveIndex(key: string): Promise<ILookupResult> {
-    return new Promise<ILookupResult>(
-        (resolve, reject) => this.mDB.get(key, (err, data) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve({
-              key: data.key,
-              value: JSON.parse(data.value)
-            });
-          }
-        }));
+    return this.getSafe(key)
+      .then(data => data === undefined ? undefined : ({
+        key: data.key,
+        value: JSON.parse(data.value),
+      }));
   }
 
   private getAllByLogicalName(logicalName: string, versionMatch: string): Promise<ILookupResult[]> {
@@ -651,6 +641,20 @@ class ModDB {
   private promisify() {
     this.mDB.getAsync = Promise.promisify(this.mDB.get);
     this.mDB.putAsync = Promise.promisify(this.mDB.put) as any;
+  }
+
+  private putSafe(key: string, data: any): Promise<void> {
+    if (this.mDB.isClosed()) {
+      return Promise.resolve();
+    }
+    return this.mDB.putAsync(key, data);
+  }
+
+  private getSafe(key): Promise<any> {
+    if (this.mDB.isClosed()) {
+      return Promise.resolve(undefined);
+    }
+    return this.mDB.getAsync(key);
   }
 }
 

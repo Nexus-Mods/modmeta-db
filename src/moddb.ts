@@ -357,7 +357,7 @@ class ModDB {
 
     return this.mNexusQuota.wait()
       .then(() => this.restGet(url, { APIKEY: server.apiKey }))
-      .then(nexusData => nexusData.map(nexusObj => this.translateFromNexus(nexusObj, gameId)))
+      .then(nexusData => nexusData.map(nexusObj => this.translateFromNexus(hash, nexusObj, gameId)))
       .catch(HTTPError, err => {
         if (err.code === 521) {
           return Promise.reject(new Error('API offline'));
@@ -404,7 +404,7 @@ class ModDB {
    *
    * @memberOf ModDB
    */
-  private translateFromNexus = (nexusObj: any, gameId: string):
+  private translateFromNexus = (hash: string, nexusObj: any, gameId: string):
       ILookupResult => {
         const urlFragments = [
           'nxm:/',
@@ -419,11 +419,11 @@ class ModDB {
             `https://www.nexusmods.com/${nexusObj.mod.game_domain}/mods/${nexusObj.mod.mod_id}/`;
         return {
           key:
-              `hash:${nexusObj.file_details.md5}:${nexusObj.file_details.size}:${gameId}:`,
+              `hash:${hash}:${nexusObj.file_details.size}:${gameId}:`,
           value: {
-            fileMD5: nexusObj.file_details.md5,
+            fileMD5: hash,
             fileName: nexusObj.file_details.file_name,
-            fileSizeBytes: nexusObj.file_details.file_size,
+            fileSizeBytes: nexusObj.file_details.size,
             logicalFileName: nexusObj.file_details.name,
             fileVersion: semvish.clean(nexusObj.file_details.version, true),
             gameId,

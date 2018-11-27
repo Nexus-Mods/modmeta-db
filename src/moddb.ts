@@ -344,6 +344,10 @@ class ModDB {
 
   private queryServerHashNexus(server: IServer, gameId: string,
                                hash: string, size: number): Promise<ILookupResult[]> {
+    if (!server.apiKey) { 
+      return Promise.resolve([]);
+    }
+
     // no result in our database, look at the backends
     const realGameId = this.translateNexusGameId(gameId || this.mGameId);
 

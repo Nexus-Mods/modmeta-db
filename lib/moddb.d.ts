@@ -40,6 +40,7 @@ declare class ModDB {
     private resolveIndex;
     private getAllByLogicalName;
     private getAllByExpression;
+    private createKey;
     private makeKey;
     private makeNameLookup;
     private makeLogicalLookup;

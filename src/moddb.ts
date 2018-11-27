@@ -258,13 +258,7 @@ class ModDB {
       });
 
     return promise.then(() => {
-      let lookupKey = `${hashResult}`;
-      if (hashFileSize !== undefined) {
-        lookupKey += ':' + hashFileSize;
-        if (gameId !== undefined) {
-          lookupKey += ':' + gameId;
-        }
-      }
+      let lookupKey = this.createKey(hashResult, hashFileSize, gameId);
       return this.getAllByKey(lookupKey, gameId)
         .tap(result => {
           // if the result is empty, put whatever we know in the cache,
@@ -336,20 +330,20 @@ class ModDB {
     return this.restGet(url);
   }
 
-  private queryServerHash(server: IServer, gameId: string, hash: string): Promise<ILookupResult[]> {
+  private queryServerHash(server: IServer, gameId: string, hash: string, size: number): Promise<ILookupResult[]> {
     if (!isMD5Hash(hash)) {
       // avoid querying a server with an invalid hash
       return Promise.resolve([]);
     }
     if (server.protocol === 'nexus') {
-      return this.queryServerHashNexus(server, gameId, hash);
+      return this.queryServerHashNexus(server, gameId, hash, size);
     } else {
       return this.queryServerHashMeta(server, hash);
     }
   }
 
   private queryServerHashNexus(server: IServer, gameId: string,
-                               hash: string): Promise<ILookupResult[]> {
+                               hash: string, size: number): Promise<ILookupResult[]> {
     // no result in our database, look at the backends
     const realGameId = this.translateNexusGameId(gameId || this.mGameId);
 
@@ -357,7 +351,8 @@ class ModDB {
 
     return this.mNexusQuota.wait()
       .then(() => this.restGet(url, { APIKEY: server.apiKey }))
-      .then(nexusData => nexusData.map(nexusObj => this.translateFromNexus(hash, nexusObj, gameId)))
+      .then(nexusData => nexusData
+        .map(nexusObj => this.translateFromNexus(hash, size, nexusObj, gameId)))
       .catch(HTTPError, err => {
         if (err.code === 521) {
           return Promise.reject(new Error('API offline'));
@@ -365,13 +360,13 @@ class ModDB {
           this.mNexusQuota.reset();
           return Promise.delay(1000)
             .then(() => this.mNexusQuota.wait())
-            .then(() => this.queryServerHashNexus(server, gameId, hash));
+            .then(() => this.queryServerHashNexus(server, gameId, hash, size));
         } else if (err.code === 404) {
           return Promise.resolve([]);
         } else {
           // TODO not sure what data contains at this point. If the api is working
           // correct it _should_ be a json object containing an error message
-          return err;
+          return Promise.reject(err);
         }
       });
   }
@@ -404,38 +399,38 @@ class ModDB {
    *
    * @memberOf ModDB
    */
-  private translateFromNexus = (hash: string, nexusObj: any, gameId: string):
-      ILookupResult => {
-        const urlFragments = [
-          'nxm:/',
-          nexusObj.mod.game_domain,
-          'mods',
-          nexusObj.mod.mod_id,
-          'files',
-          nexusObj.file_details.file_id,
-        ];
+  private translateFromNexus = (hash: string, size: number, nexusObj: any, gameId: string): ILookupResult => {
+    const realSize = size || (nexusObj.file_details.size * 1024);
+    const urlFragments = [
+      'nxm:/',
+      nexusObj.mod.game_domain,
+      'mods',
+      nexusObj.mod.mod_id,
+      'files',
+      nexusObj.file_details.file_id,
+    ];
 
-        const page =
-            `https://www.nexusmods.com/${nexusObj.mod.game_domain}/mods/${nexusObj.mod.mod_id}/`;
-        return {
-          key:
-              `hash:${hash}:${nexusObj.file_details.size}:${gameId}:`,
-          value: {
-            fileMD5: hash,
-            fileName: nexusObj.file_details.file_name,
-            fileSizeBytes: nexusObj.file_details.size,
-            logicalFileName: nexusObj.file_details.name,
-            fileVersion: semvish.clean(nexusObj.file_details.version, true),
-            gameId,
-            sourceURI: urlFragments.join('/'),
-            details: {
-              category: nexusObj.mod.category_id,
-              description: nexusObj.mod.description,
-              author: nexusObj.mod.author,
-              homepage: page,
-            },
-          },
-        };
+    const page =
+      `https://www.nexusmods.com/${nexusObj.mod.game_domain}/mods/${nexusObj.mod.mod_id}/`;
+    return {
+      key:
+        `hash:${hash}:${realSize}:${gameId}:`,
+      value: {
+        fileMD5: hash,
+        fileName: nexusObj.file_details.file_name,
+        fileSizeBytes: realSize,
+        logicalFileName: nexusObj.file_details.name,
+        fileVersion: semvish.clean(nexusObj.file_details.version, true),
+        gameId,
+        sourceURI: urlFragments.join('/'),
+        details: {
+          category: nexusObj.mod.category_id,
+          description: nexusObj.mod.description,
+          author: nexusObj.mod.author,
+          homepage: page,
+        },
+      },
+    };
   }
 
   private readRange<T>(type: 'hash' | 'log' | 'name', key: string,
@@ -505,7 +500,9 @@ class ModDB {
             return Promise.resolve(results);
           }
 
-          const hash = key.split(':')[0];
+          const keySplit = key.split(':');
+          const hash = keySplit[0];
+          const size = parseInt(keySplit[1], 10);
           let remoteResults: ILookupResult[];
 
           return Promise.mapSeries(this.mServers, (server: IServer) => {
@@ -513,7 +510,7 @@ class ModDB {
               // only use the results from the first server that had anything
               return Promise.resolve();
             }
-            return this.queryServerHash(server, gameId, hash)
+            return this.queryServerHash(server, gameId, hash, size)
                 .then((serverResults: ILookupResult[]) => {
                   remoteResults = serverResults;
                   return this.cacheResults(remoteResults, server.cacheDurationSec);
@@ -619,6 +616,17 @@ class ModDB {
                 });
           }).then(() => Promise.resolve(remoteResults || []));
         });
+  }
+
+  private createKey(hash: string, size: number, gameId: string) {
+    let lookupKey = `${hash}`;
+    if (size !== undefined) {
+      lookupKey += ':' + size;
+      if (gameId !== undefined) {
+        lookupKey += ':' + gameId;
+      }
+    }
+    return lookupKey;
   }
 
   private makeKey(mod: IModInfo) {

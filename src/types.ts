@@ -136,3 +136,8 @@ export interface IHashResult {
   md5sum: string;
   numBytes: number;
 }
+export interface IServer {
+  nexus?: any;
+  url: string;
+  cacheDurationSec: number;
+}

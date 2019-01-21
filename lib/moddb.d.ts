@@ -1,11 +1,5 @@
 import * as Promise from 'bluebird';
-import { ILookupResult, IModInfo } from './types';
-export interface IServer {
-    protocol: 'nexus' | 'metadb';
-    url: string;
-    apiKey?: string;
-    cacheDurationSec: number;
-}
+import { ILookupResult, IModInfo, IServer } from './types';
 export declare type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 export declare type LogFunc = (level: LogLevel, message: string, extra?: any) => void;
 declare class ModDB {
@@ -21,6 +15,7 @@ declare class ModDB {
     constructor(gameId: string, servers: IServer[], log?: LogFunc, timeoutMS?: number);
     connect(dbName: string, database: any): Promise<void>;
     close(): Promise<void>;
+    addServer(server: IServer): void;
     setGameId(gameId: string): void;
     getByKey(key: string): Promise<ILookupResult[]>;
     getByLogicalName(logicalName: string, versionMatch: string): Promise<ILookupResult[]>;

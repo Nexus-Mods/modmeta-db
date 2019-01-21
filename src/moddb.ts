@@ -6,25 +6,19 @@ import * as encode from 'encoding-down';
 import * as http from 'http';
 import * as https from 'https';
 import * as leveldown from 'leveldown';
+import { NexusError } from 'nexus-api';
 import * as path from 'path';
 import * as semvish from 'semvish';
 import * as url from 'url';
 
 import Quota from './Quota';
 import { QUOTA_MAX, QUOTA_RATE_MS } from './nexusParams';
-import {IHashResult, IIndexResult, ILookupResult, IModInfo} from './types';
+import {IHashResult, IIndexResult, ILookupResult, IModInfo, IServer} from './types';
 import {genHash} from './util';
 
 interface ILevelUpAsync extends levelup.LevelUp {
   getAsync?: (key: string) => Promise<any>;
   putAsync?: (key: string, data: any) => Promise<void>;
-}
-
-export interface IServer {
-  protocol: 'nexus' | 'metadb';
-  url: string;
-  apiKey?: string;
-  cacheDurationSec: number;
 }
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -149,6 +143,10 @@ class ModDB {
         resolve();
       });
     });
+  }
+
+  public addServer(server: IServer) {
+    this.mServers.push(server);
   }
 
   /**
@@ -321,7 +319,7 @@ class ModDB {
 
   private queryServerLogical(server: IServer, logicalName: string,
                              versionMatch: string): Promise<ILookupResult[]> {
-    if (server.protocol === 'nexus') {
+    if (server.nexus !== undefined) {
       // not supported
       return Promise.resolve([]);
     }
@@ -335,7 +333,7 @@ class ModDB {
       // avoid querying a server with an invalid hash
       return Promise.resolve([]);
     }
-    if (server.protocol === 'nexus') {
+    if (server.nexus !== undefined) {
       return this.queryServerHashNexus(server, gameId, hash, size);
     } else {
       return this.queryServerHashMeta(server, hash);
@@ -344,28 +342,13 @@ class ModDB {
 
   private queryServerHashNexus(server: IServer, gameId: string,
                                hash: string, size: number): Promise<ILookupResult[]> {
-    if (!server.apiKey) { 
-      return Promise.resolve([]);
-    }
-
-    // no result in our database, look at the backends
-    const realGameId = this.translateNexusGameId(gameId || this.mGameId);
-
-    const url = `${server.url}/games/${realGameId}/mods/md5_search/${hash}`;
-
-    return this.mNexusQuota.wait()
-      .then(() => this.restGet(url, { APIKEY: server.apiKey }))
+    return Promise.resolve(server.nexus.getFileByMD5(hash, gameId))
       .then(nexusData => nexusData
         .map(nexusObj => this.translateFromNexus(hash, size, nexusObj, gameId)))
-      .catch(HTTPError, err => {
-        if (err.code === 521) {
+      .catch(NexusError, err => {
+        if (err.statusCode === 521) {
           return Promise.reject(new Error('API offline'));
-        } else if (err.code === 429) {
-          this.mNexusQuota.reset();
-          return Promise.delay(1000)
-            .then(() => this.mNexusQuota.wait())
-            .then(() => this.queryServerHashNexus(server, gameId, hash, size));
-        } else if (err.code === 404) {
+        } else if (err.statusCode === 404) {
           return Promise.resolve([]);
         } else {
           // TODO not sure what data contains at this point. If the api is working

@@ -32,6 +32,7 @@
     "@types/serve-static": "^1.7.31",
     "fs-extra-promise": "^1.0.1",
     "ts-node": "^3.0.2",
+    "nexus-api": "Nexus-Mods/node-nexus-api",
     "typescript": "^3.0.1"
   },
   "optionalDependencies": {

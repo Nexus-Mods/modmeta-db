@@ -342,7 +342,7 @@ class ModDB {
 
   private queryServerHashNexus(server: IServer, gameId: string,
                                hash: string, size: number): Promise<ILookupResult[]> {
-    return Promise.resolve(server.nexus.getFileByMD5(hash, gameId))
+    return Promise.resolve(server.nexus.getFileByMD5(hash, this.translateNexusGameId(gameId)))
       .then(nexusData => nexusData
         .map(nexusObj => this.translateFromNexus(hash, size, nexusObj, gameId)))
       .catch(NexusError, err => {

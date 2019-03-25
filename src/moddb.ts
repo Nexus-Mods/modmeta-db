@@ -390,7 +390,7 @@ class ModDB {
     const realSize = size || (nexusObj.file_details.size * 1024);
     const urlFragments = [
       'nxm:/',
-      nexusObj.mod.game_domain,
+      nexusObj.mod.domain_name,
       'mods',
       nexusObj.mod.mod_id,
       'files',
@@ -398,7 +398,7 @@ class ModDB {
     ];
 
     const page =
-      `https://www.nexusmods.com/${nexusObj.mod.game_domain}/mods/${nexusObj.mod.mod_id}/`;
+      `https://www.nexusmods.com/${nexusObj.mod.domain_name}/mods/${nexusObj.mod.mod_id}/`;
     return {
       key:
         `hash:${hash}:${realSize}:${gameId}:`,
@@ -409,6 +409,7 @@ class ModDB {
         logicalFileName: nexusObj.file_details.name,
         fileVersion: semvish.clean(nexusObj.file_details.version, true),
         gameId,
+        domainName: nexusObj.mod.domain_name,
         sourceURI: urlFragments.join('/'),
         details: {
           category: nexusObj.mod.category_id,

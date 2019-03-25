@@ -100,6 +100,7 @@ export interface IModInfo {
   fileName: string;
   fileSizeBytes: number;
   gameId: string;
+  domainName?: string;
   logicalFileName?: string;
   fileVersion: string;
   fileMD5: string;

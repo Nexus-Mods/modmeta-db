@@ -1,6 +1,6 @@
 {
   "name": "modmeta-db",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Serves dependencies and other meta information for mod files.",
   "main": "lib/index.js",
   "scripts": {
@@ -12,11 +12,13 @@
   ],
   "author": "Black Tree Gaming Ltd",
   "license": "GPL-3.0",
+  "peerDependencies": {
+    "encoding-down": "*",
+    "leveldown": "*",
+    "levelup": "*"
+  },
   "dependencies": {
     "bluebird": "^3.4.6",
-    "encoding-down": "^5.0.4",
-    "leveldown": "^4.0.1",
-    "levelup": "^3.1.1",
     "minimatch": "^3.0.4",
     "semvish": "^1.1.0"
   },

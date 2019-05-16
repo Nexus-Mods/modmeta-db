@@ -158,7 +158,7 @@ class ModDB {
    * @memberOf ModDB
    */
   public setGameId(gameId: string) {
-    this.mGameId = gameId;
+    this.mGameId = gameId.toLowerCase();
   }
 
   /**
@@ -240,6 +240,9 @@ class ModDB {
    */
   public lookup(filePath?: string, fileMD5?: string, fileSize?: number,
                 gameId?: string): Promise<ILookupResult[]> {
+    if (gameId !== undefined) {
+      gameId = gameId.toLowerCase();
+    }
     let hashResult: string = fileMD5;
     let hashFileSize: number = fileSize;
 

@@ -2,6 +2,7 @@ import * as Promise from 'bluebird';
 import { ILookupResult, IModInfo, IServer } from './types';
 export declare type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 export declare type LogFunc = (level: LogLevel, message: string, extra?: any) => void;
+export declare function svclean(input: string): string;
 declare class ModDB {
     private mDB;
     private mServers;

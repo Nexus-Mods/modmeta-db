@@ -8,7 +8,7 @@ import * as https from 'https';
 import * as leveldown from 'leveldown';
 import { NexusError } from 'nexus-api';
 import * as path from 'path';
-import * as semvish from 'semvish';
+import * as semver from 'semver';
 import * as url from 'url';
 
 import Quota from './Quota';
@@ -29,6 +29,14 @@ interface IHTTP {
   request: (options: https.RequestOptions | string | URL,
             callback?: (res: http.IncomingMessage) => void) => http.ClientRequest;
   Agent: typeof http.Agent;
+}
+
+export function svclean(input: string): string {
+  let res = semver.valid(semver.coerce(input));
+  if (res !== null) {
+    res = semver.clean(res);
+  }
+  return res || '0.0.0-' + input;
 }
 
 class HTTPError extends Error {
@@ -410,7 +418,7 @@ class ModDB {
         fileName: nexusObj.file_details.file_name,
         fileSizeBytes: realSize,
         logicalFileName: nexusObj.file_details.name,
-        fileVersion: semvish.clean(nexusObj.file_details.version, true),
+        fileVersion: svclean(nexusObj.file_details.version),
         gameId,
         domainName: nexusObj.mod.domain_name,
         sourceURI: urlFragments.join('/'),
@@ -530,7 +538,7 @@ class ModDB {
       return Promise.resolve([]);
     }
     const versionFilter = res =>
-        semvish.satisfies(res.key.split(':')[2], versionMatch, false);
+        semver.satisfies(svclean(res.key.split(':')[2]), versionMatch, false);
     return this.readRange<IIndexResult>('log', logicalName)
         .then((results: IIndexResult[]) =>
                   Promise.map(results.filter(versionFilter),
@@ -571,7 +579,7 @@ class ModDB {
     const filter = res => {
       const [type, fileName, version] = res.key.split(':');
       return minimatch(fileName, expression)
-        && semvish.satisfies(version, versionMatch, false);
+        && semver.satisfies(svclean(version), versionMatch, false);
     };
 
     const staticPart = expression.split(/[?*]/)[0];

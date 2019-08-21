@@ -6,7 +6,7 @@ import * as encode from 'encoding-down';
 import * as http from 'http';
 import * as https from 'https';
 import * as leveldown from 'leveldown';
-import { NexusError } from 'nexus-api';
+import { NexusError, IMD5Result } from 'nexus-api';
 import * as path from 'path';
 import * as semver from 'semver';
 import * as url from 'url';
@@ -397,7 +397,7 @@ class ModDB {
    *
    * @memberOf ModDB
    */
-  private translateFromNexus = (hash: string, size: number, nexusObj: any, gameId: string): ILookupResult => {
+  private translateFromNexus = (hash: string, size: number, nexusObj: IMD5Result, gameId: string): ILookupResult => {
     const realSize = size || (nexusObj.file_details.size * 1024);
     const urlFragments = [
       'nxm:/',
@@ -422,11 +422,14 @@ class ModDB {
         gameId,
         domainName: nexusObj.mod.domain_name,
         sourceURI: urlFragments.join('/'),
+        source: 'nexus',
         details: {
-          category: nexusObj.mod.category_id,
+          category: nexusObj.mod.category_id.toString(),
           description: nexusObj.mod.description,
           author: nexusObj.mod.author,
           homepage: page,
+          modId: nexusObj.mod.mod_id.toString(),
+          fileId: nexusObj.file_details.file_id.toString(),
         },
       },
     };

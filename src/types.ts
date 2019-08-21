@@ -1,3 +1,5 @@
+import Nexus from 'nexus-api';
+
 /**
  * reference to a mod file.
  *
@@ -105,6 +107,7 @@ export interface IModInfo {
   fileVersion: string;
   fileMD5: string;
   sourceURI: any;
+  source?: string;
   rules?: IRule[];
   expires?: number;
   details?: {
@@ -112,6 +115,8 @@ export interface IModInfo {
     category?: string;
     description?: string;
     author?: string;
+    modId?: string;
+    fileId?: string;
   };
 }
 
@@ -138,7 +143,7 @@ export interface IHashResult {
   numBytes: number;
 }
 export interface IServer {
-  nexus?: any;
+  nexus?: Nexus;
   url: string;
   cacheDurationSec: number;
 }

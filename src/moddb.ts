@@ -206,7 +206,8 @@ class ModDB {
       return Promise.resolve([]);
     }
 
-    return this.getAllByKey(key, gameId || this.mGameId);
+    return this.getAllByKey(key, gameId || this.mGameId)
+      .filter((result: ILookupResult) => (gameId === undefined) || result.key.split(':')[2] === gameId);
   }
 
   /**

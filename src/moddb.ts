@@ -206,8 +206,7 @@ class ModDB {
       return Promise.resolve([]);
     }
 
-    return this.getAllByKey(key, gameId || this.mGameId)
-      .filter((result: ILookupResult) => (gameId === undefined) || result.key.split(':')[2] === gameId);
+    return this.getAllByKey(key, gameId || this.mGameId);
   }
 
   /**
@@ -293,11 +292,6 @@ class ModDB {
     return promise.then(() => {
       let lookupKey = this.createKey(hashResult, hashFileSize, gameId);
       return this.getAllByKey(lookupKey, gameId)
-        // it's possible that the caller knows the game id but not the size.
-        // In this case the key can't include the gameid as a marker either
-        // so we have to filter here
-        .filter((result: ILookupResult) =>
-          (gameId === undefined) || result.key.split(':')[2] === gameId)
         .tap(result => {
           // if the result is empty, put whatever we know in the cache,
           // just to avoid re-querying the server
@@ -527,6 +521,11 @@ class ModDB {
 
     return this.readRange<ILookupResult>('hash', key)
         .then((results: ILookupResult[]) => {
+          // it's possible that the caller knows the game id but not the size.
+          // In this case the key can't include the gameid as a marker either
+          // so we have to filter here
+          results = results.filter(result =>
+            (gameId === undefined) || result.key.split(':')[3] === gameId);
           if (results.length > 0) {
             return Promise.resolve(results);
           }

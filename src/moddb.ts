@@ -13,7 +13,7 @@ import * as url from 'url';
 
 import Quota from './Quota';
 import { QUOTA_MAX, QUOTA_RATE_MS } from './nexusParams';
-import {IHashResult, IIndexResult, ILookupResult, IModInfo, IServer} from './types';
+import {IHashResult, IIndexResult, ILookupResult, IModInfo, IServer, IReference} from './types';
 import {genHash} from './util';
 
 interface ILevelUpAsync extends levelup.LevelUp {
@@ -159,7 +159,7 @@ class ModDB {
 
   /**
    * update the gameId which is used as the default for lookups to the nexus
-   * api if the game id of the file being looked up isn't available
+   * api if the game id of the file being looked up isn't provided
    *
    * @param {string} gameId
    *
@@ -170,20 +170,43 @@ class ModDB {
   }
 
   /**
+   * retrieve a mod using a reference as part it was returned from other lookup calls
+   * @param ref the reference to look up
+   */
+  public getByReference(ref: IReference): Promise<ILookupResult[]> {
+    if (ref.fileMD5 !== undefined) {
+      if ((ref.fileSize !== undefined) && (ref.gameId !== undefined)) {
+        return this.getByKey(this.createKey(ref.fileMD5, ref.fileSize, ref.gameId), ref.gameId);
+      } else {
+        return this.getByKey(ref.fileMD5, ref.gameId);
+      }
+    } else if (ref.logicalFileName !== undefined) {
+      return this.getByLogicalName(ref.logicalFileName, ref.versionMatch);
+    } else if (ref.fileExpression !== undefined) {
+      return this.getByExpression(ref.fileExpression, ref.versionMatch);
+    } else {
+      return Promise.reject(new Error(`empty mod reference: "${JSON.stringify(ref)}"`));
+    }
+  }
+
+  /**
    * retrieve a mod if the hash (or a full key) is already known
    *
-   * @param {string} hash
+   * @param {string} key the hash or full key (<hash>:<size>:<gameid>) to look up
+   * @param {string} gameId the game id to look up. This will only have an effect if the first parameter
+   *                        contains only the hash, in which case the result will be filtered to contain
+   *                        only the game id.
    * @returns {Promise<ILookupResult[]>}
    *
    * @memberOf ModDB
    */
-  public getByKey(key: string): Promise<ILookupResult[]> {
+  public getByKey(key: string, gameId?: string): Promise<ILookupResult[]> {
     if (this.mDB.isClosed()) {
       // database already closed
       return Promise.resolve([]);
     }
 
-    return this.getAllByKey(key, this.mGameId);
+    return this.getAllByKey(key, gameId || this.mGameId);
   }
 
   /**
@@ -269,6 +292,11 @@ class ModDB {
     return promise.then(() => {
       let lookupKey = this.createKey(hashResult, hashFileSize, gameId);
       return this.getAllByKey(lookupKey, gameId)
+        // it's possible that the caller knows the game id but not the size.
+        // In this case the key can't include the gameid as a marker either
+        // so we have to filter here
+        .filter((result: ILookupResult) =>
+          (gameId === undefined) || result.key.split(':')[2] === gameId)
         .tap(result => {
           // if the result is empty, put whatever we know in the cache,
           // just to avoid re-querying the server
@@ -490,7 +518,7 @@ class ModDB {
     .then(() => null);
   }
 
-  private getAllByKey(key: string, gameId: string): Promise<ILookupResult[]> {
+  private getAllByKey(key: string, gameId?: string): Promise<ILookupResult[]> {
     if (this.mBlacklist.has(JSON.stringify({ key, gameId }))) {
       // avoid querying the same keys again and again
       return Promise.resolve([]);

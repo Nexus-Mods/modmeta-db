@@ -5,6 +5,7 @@ import Nexus from 'nexus-api';
  *
  * This can be a reference to one exact file, using the md5 hash of that file or
  * to different versions of the same file.
+ * file size and gameid can be included to avoid ambiguity
  *
  * When referencing multiple versions of a file you need to specify the modId, the
  * version numbers to accept (see below) and which file to use.
@@ -69,6 +70,8 @@ import Nexus from 'nexus-api';
  */
 export interface IReference {
   fileMD5?: string;
+  fileSize?: number;
+  gameId?: string;
   versionMatch?: string;
   logicalFileName?: string;
   fileExpression?: string;

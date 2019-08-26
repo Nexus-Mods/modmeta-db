@@ -1,6 +1,8 @@
 import Nexus from 'nexus-api';
 export interface IReference {
     fileMD5?: string;
+    fileSize?: number;
+    gameId?: string;
     versionMatch?: string;
     logicalFileName?: string;
     fileExpression?: string;

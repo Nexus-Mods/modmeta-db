@@ -1,5 +1,5 @@
 import * as Promise from 'bluebird';
-import { ILookupResult, IModInfo, IServer } from './types';
+import { ILookupResult, IModInfo, IServer, IReference } from './types';
 export declare type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 export declare type LogFunc = (level: LogLevel, message: string, extra?: any) => void;
 export declare function svclean(input: string): string;
@@ -18,7 +18,8 @@ declare class ModDB {
     close(): Promise<void>;
     addServer(server: IServer): void;
     setGameId(gameId: string): void;
-    getByKey(key: string): Promise<ILookupResult[]>;
+    getByReference(ref: IReference): Promise<ILookupResult[]>;
+    getByKey(key: string, gameId?: string): Promise<ILookupResult[]>;
     getByLogicalName(logicalName: string, versionMatch: string): Promise<ILookupResult[]>;
     getByExpression(expression: string, versionMatch: string): Promise<ILookupResult[]>;
     insert(mod: IModInfo): Promise<void>;

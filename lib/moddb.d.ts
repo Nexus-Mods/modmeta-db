@@ -11,7 +11,8 @@ declare class ModDB {
     private mGameId;
     private mBlacklist;
     private mLog;
-    private mNexusQuota;
+    private mRemainingExpires;
+    private mExpireHour;
     static create(dbName: string, gameId: string, servers: IServer[], log?: LogFunc, database?: any, timeoutMS?: number): Promise<ModDB>;
     constructor(gameId: string, servers: IServer[], log?: LogFunc, timeoutMS?: number);
     connect(dbName: string, database: any): Promise<void>;
@@ -22,7 +23,7 @@ declare class ModDB {
     getByKey(key: string, gameId?: string): Promise<ILookupResult[]>;
     getByLogicalName(logicalName: string, versionMatch: string): Promise<ILookupResult[]>;
     getByExpression(expression: string, versionMatch: string): Promise<ILookupResult[]>;
-    insert(mod: IModInfo): Promise<void>;
+    insert(mods: IModInfo[]): Promise<void>;
     lookup(filePath?: string, fileMD5?: string, fileSize?: number, gameId?: string): Promise<ILookupResult[]>;
     private restGet;
     private queryServerLogical;
@@ -33,6 +34,7 @@ declare class ModDB {
     private translateFromNexus;
     private readRange;
     private cacheResults;
+    private expireResults;
     private getAllByKey;
     private resolveIndex;
     private getAllByLogicalName;

@@ -11,8 +11,7 @@ import * as path from 'path';
 import * as semver from 'semver';
 import * as url from 'url';
 
-import Quota from './Quota';
-import { QUOTA_MAX, QUOTA_RATE_MS } from './nexusParams';
+import * as params from './parameters';
 import {IHashResult, IIndexResult, ILookupResult, IModInfo, IServer, IReference} from './types';
 import {genHash} from './util';
 
@@ -79,7 +78,8 @@ class ModDB {
   private mGameId: string;
   private mBlacklist: Set<string> = new Set();
   private mLog: LogFunc;
-  private mNexusQuota: Quota;
+  private mRemainingExpires: number = params.REFETCH_PER_HOUR;
+  private mExpireHour: number = (new Date()).getHours();
 
   public static create(dbName: string,
               gameId: string,
@@ -120,7 +120,6 @@ class ModDB {
     this.mServers = servers;
     this.mTimeout = timeoutMS;
     this.mLog = log || (() => undefined);
-    this.mNexusQuota = new Quota(QUOTA_MAX, QUOTA_MAX, QUOTA_RATE_MS);
   }
 
   public connect(dbName: string, database: any): Promise<void> {
@@ -239,19 +238,31 @@ class ModDB {
    *
    * @memberOf ModDB
    */
-  public insert(mod: IModInfo): Promise<void> {
-    const missingKeys = this.missingKeys(mod);
-    if (missingKeys.length !== 0) {
-      return Promise.reject(new Error('Invalid mod object. Missing keys: ' +
-                                      missingKeys.join(', ')));
+  public insert(mods: IModInfo[]): Promise<void> {
+    try {
+      const groups: { [key: string]: IModInfo[] } = mods.reduce((prev, mod) => {
+        const missingKeys = this.missingKeys(mod);
+        if (missingKeys.length !== 0) {
+          throw new Error('Invalid mod object. Missing keys: ' +
+            missingKeys.join(', '));
+        }
+        const key = this.makeKey(mod);
+        if (prev[key] === undefined) {
+          prev[key] = [];
+        }
+        prev[key].push(mod);
+        return prev;
+      }, {});
+      return Promise.map(Object.keys(groups), key =>
+        this.putSafe(key, JSON.stringify(groups[key]))
+          .then(() => Promise.map(groups[key], mod =>
+            this.putSafe(this.makeNameLookup(mod), key)))
+          .then(() => Promise.map(groups[key], mod =>
+            this.putSafe(this.makeLogicalLookup(mod), key))))
+        .then(() => null);
+    } catch (err) {
+      return Promise.reject(err);
     }
-
-    const key = this.makeKey(mod);
-
-    return this.putSafe(key, JSON.stringify(mod))
-      .then(() => this.putSafe(this.makeNameLookup(mod), key))
-      .then(() => this.putSafe(this.makeLogicalLookup(mod), key))
-    ;
   }
 
   /**
@@ -296,14 +307,15 @@ class ModDB {
           // if the result is empty, put whatever we know in the cache,
           // just to avoid re-querying the server
           if (result.length === 0) {
-            this.insert({
+            this.insert([{
               fileMD5: hashResult,
               fileName: filePath !== undefined ? path.basename(filePath) : undefined,
               fileSizeBytes: hashFileSize,
               fileVersion: '',
               gameId,
               sourceURI: '',
-            });
+              expires: params.EXPIRE_INVALID_SEC,
+            }]);
           }
         });
     });
@@ -483,10 +495,18 @@ class ModDB {
 
       stream.on('data', (data: {key: string, value: string}) => {
         try {
-          result.push({
-            key: data.key,
-            value: JSON.parse(data.value),
-          } as any);
+          const value = JSON.parse(data.value);
+          if (Array.isArray(value)) {
+            result.push(...value.map(val => ({
+              key: data.key,
+              value: val,
+            } as any)));
+          } else {
+            result.push({
+              key: data.key,
+              value,
+            } as any);
+          }
         } catch (err) {
           this.mLog('warn', 'Invalid data stored for', data.key);
         }
@@ -501,16 +521,38 @@ class ModDB {
       return Promise.resolve();
     }
 
+    const date = Math.floor(Date.now() / 1000);
+
     // cache all results in our database
-    return Promise.mapSeries(results, result => {
-      // TODO: cached results currently don't expire
-      /*
-      const temp = { ...result.value };
-      temp.expires = new Date().getTime() / 1000 + lifeTime;
-      */
-      return this.insert(result.value);
-    })
-    .then(() => null);
+    return this.insert(results.map(result => ({
+      ...result.value,
+      expires: date + lifeTime,
+    })));
+  }
+
+  private expireResults(input: ILookupResult[]): boolean {
+    if (input.length === 0) {
+      return false;
+    }
+
+    const date = new Date();
+    if (date.getHours() !== this.mExpireHour) {
+      this.mRemainingExpires = params.REFETCH_PER_HOUR;
+    }
+
+    // don't expire if we've done too much of that in the last hour
+    if (this.mRemainingExpires === 0) {
+      return false;
+    }
+
+    // don't expire if we have valid results
+    if (input.find(res => (res.value.expires !== undefined)
+                       && (res.value.expires * 1000 > date.getTime())) !== undefined) {
+      return false;
+    }
+
+    --this.mRemainingExpires;
+    return true;
   }
 
   private getAllByKey(key: string, gameId?: string): Promise<ILookupResult[]> {
@@ -526,6 +568,11 @@ class ModDB {
           // so we have to filter here
           results = results.filter(result =>
             (gameId === undefined) || result.key.split(':')[3] === gameId);
+
+          if (this.expireResults(results)) {
+            results = [];
+          }
+
           if (results.length > 0) {
             return Promise.resolve(results);
           }

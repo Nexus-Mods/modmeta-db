@@ -184,7 +184,8 @@ class ModDB {
     } else if (ref.fileExpression !== undefined) {
       return this.getByExpression(ref.fileExpression, ref.versionMatch);
     } else {
-      return Promise.reject(new Error(`empty mod reference: "${JSON.stringify(ref)}"`));
+      // empty mod reference, no way we could find anything
+      return Promise.resolve([]);
     }
   }
 
@@ -210,6 +211,7 @@ class ModDB {
 
   /**
    * retrieve mods by their logical name and version
+   * does not work on nexus servers
    */
   public getByLogicalName(logicalName: string, versionMatch: string): Promise<ILookupResult[]> {
     if (this.mDB.isClosed()) {
@@ -220,6 +222,10 @@ class ModDB {
     return this.getAllByLogicalName(logicalName, versionMatch);
   }
 
+  /**
+   * retrieve mods by a file expression match and version
+   * does not work on nexus servers
+   */
   public getByExpression(expression: string, versionMatch: string): Promise<ILookupResult[]> {
     if (this.mDB.isClosed()) {
       // database already closed
@@ -370,7 +376,7 @@ class ModDB {
       return Promise.resolve([]);
     }
 
-    const url = `${server.url}/by_name/${logicalName}/versionMatch`;
+    const url = `${server.url}/by_name/${logicalName}/${versionMatch}`;
     return this.restGet(url);
   }
 
@@ -495,17 +501,21 @@ class ModDB {
 
       stream.on('data', (data: {key: string, value: string}) => {
         try {
-          const value = JSON.parse(data.value);
-          if (Array.isArray(value)) {
-            result.push(...value.map(val => ({
-              key: data.key,
-              value: val,
-            } as any)));
+          if (type === 'hash') {
+            const value = JSON.parse(data.value);
+            if (Array.isArray(value)) {
+              result.push(...value.map(val => ({
+                key: data.key,
+                value: val,
+              } as any)));
+            } else {
+              result.push({
+                key: data.key,
+                value,
+              } as any);
+            }
           } else {
-            result.push({
-              key: data.key,
-              value,
-            } as any);
+            result.push(data as any);
           }
         } catch (err) {
           this.mLog('warn', 'Invalid data stored for', data.key);
@@ -606,9 +616,18 @@ class ModDB {
   private resolveIndex(key: string): Promise<ILookupResult> {
     return this.getSafe(key)
       .then(data => data === undefined ? undefined : ({
-        key: data.key,
-        value: JSON.parse(data.value),
-      }));
+        key: key,
+        value: JSON.parse(data),
+      }))
+      .catch(err => {
+        // this is bad actually, it indicates we have an invalid index entry
+        // which means database corruption
+        this.mLog('warn', 'failed to look up key from index', {
+          key,
+          error: err.message,
+        });
+        return Promise.resolve(undefined);
+      });
   }
 
   private getAllByLogicalName(logicalName: string, versionMatch: string): Promise<ILookupResult[]> {
@@ -618,36 +637,35 @@ class ModDB {
     const versionFilter = res =>
         semver.satisfies(svclean(res.key.split(':')[2]), versionMatch, false);
     return this.readRange<IIndexResult>('log', logicalName)
-        .then((results: IIndexResult[]) =>
-                  Promise.map(results.filter(versionFilter),
-                              (indexResult: IIndexResult) =>
-                                  this.resolveIndex(indexResult.value)))
-        .then((results: ILookupResult[]) => {
-          if (results.length > 0) {
-            return Promise.resolve(results);
+      .then((results: IIndexResult[]) =>
+        Promise.map(results.filter(versionFilter), (indexResult: IIndexResult) =>
+          this.resolveIndex(indexResult.value))
+          .filter(res => res !== undefined))
+      .then((results: ILookupResult[]) => {
+        if (results.length > 0) {
+          return Promise.resolve(results);
+        }
+
+        let remoteResults: ILookupResult[];
+
+        return Promise.mapSeries(this.mServers, (server: IServer) => {
+          if (remoteResults) {
+            return Promise.resolve();
           }
-
-          let remoteResults: ILookupResult[];
-
-          return Promise.mapSeries(this.mServers, (server: IServer) => {
-            if (remoteResults) {
-              return Promise.resolve();
-            }
-            return this.queryServerLogical(server, logicalName,
-                                            versionMatch)
-                .then((serverResults: ILookupResult[]) => {
-                  remoteResults = serverResults;
-                  return this.cacheResults(remoteResults, server.cacheDurationSec);
-                })
-                .catch(err => {
-                  this.mLog('warn', 'failed to query by logical name', {
-                    server: server.url, logicalName, versionMatch,
-                    error: err.message.toString(),
-                  });
-                  this.mBlacklist.add(JSON.stringify({ logicalName, versionMatch }));
-                });
-          }).then(() => Promise.resolve(remoteResults || []));
-        });
+          return this.queryServerLogical(server, logicalName, versionMatch)
+            .then((serverResults: ILookupResult[]) => {
+              remoteResults = serverResults;
+              return this.cacheResults(remoteResults, server.cacheDurationSec);
+            })
+            .catch(err => {
+              this.mLog('warn', 'failed to query by logical name', {
+                server: server.url, logicalName, versionMatch,
+                error: err.message.toString(),
+              });
+              this.mBlacklist.add(JSON.stringify({ logicalName, versionMatch }));
+            });
+        }).then(() => Promise.resolve(remoteResults || []));
+      });
   }
 
   private getAllByExpression(expression: string, versionMatch: string): Promise<ILookupResult[]> {
@@ -678,8 +696,7 @@ class ModDB {
             if (remoteResults) {
               return Promise.resolve();
             }
-            return this.queryServerLogical(server, expression,
-                                            versionMatch)
+            return this.queryServerLogical(server, expression, versionMatch)
                 .then((serverResults: ILookupResult[]) => {
                   remoteResults = serverResults;
                   return this.cacheResults(remoteResults, server.cacheDurationSec);

@@ -20,6 +20,18 @@ interface ILevelUpAsync extends levelup.LevelUp {
   putAsync?: (key: string, data: any) => Promise<void>;
 }
 
+interface ILookupResultRaw {
+  key: string;
+  value: IModInfo[];
+}
+
+function fromRawReducer(prev: ILookupResult[], input: ILookupResultRaw): ILookupResult[] {
+  input.value.forEach(val => {
+    prev.push({ key: input.key, value: val });
+  })
+  return prev;
+}
+
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 export type LogFunc = (level: LogLevel, message: string, extra?: any) => void;
 
@@ -613,12 +625,21 @@ class ModDB {
         });
   }
 
-  private resolveIndex(key: string): Promise<ILookupResult> {
+  private resolveIndex(key: string): Promise<ILookupResultRaw> {
     return this.getSafe(key)
-      .then(data => data === undefined ? undefined : ({
-        key: key,
-        value: JSON.parse(data),
-      }))
+      .then(data => {
+        if (data === undefined) {
+          return undefined;
+        }
+
+        const value = JSON.parse(data);
+
+        if (Array.isArray(value)) {
+          return { key, value };
+        } else {
+          return { key, value: [value] };
+        }
+      })
       .catch(err => {
         // this is bad actually, it indicates we have an invalid index entry
         // which means database corruption
@@ -641,9 +662,9 @@ class ModDB {
         Promise.map(results.filter(versionFilter), (indexResult: IIndexResult) =>
           this.resolveIndex(indexResult.value))
           .filter(res => res !== undefined))
-      .then((results: ILookupResult[]) => {
+      .then((results: ILookupResultRaw[]) => {
         if (results.length > 0) {
-          return Promise.resolve(results);
+          return Promise.resolve(results.reduce(fromRawReducer, []));
         }
 
         let remoteResults: ILookupResult[];
@@ -685,9 +706,9 @@ class ModDB {
                   Promise.map(results.filter(filter),
                               (indexResult: IIndexResult) =>
                                   this.resolveIndex(indexResult.value)))
-        .then((results: ILookupResult[]) => {
+        .then((results: ILookupResultRaw[]) => {
           if (results.length > 0) {
-            return Promise.resolve(results);
+            return Promise.resolve(results.reduce(fromRawReducer, []));
           }
 
           let remoteResults: ILookupResult[];

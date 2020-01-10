@@ -1,6 +1,6 @@
 {
   "name": "modmeta-db",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Serves dependencies and other meta information for mod files.",
   "main": "lib/index.js",
   "scripts": {
@@ -35,7 +35,6 @@
     "@types/minimatch": "^2.0.29",
     "@types/serve-static": "^1.7.31",
     "encoding-down": "*",
-    "fs-extra-promise": "^1.0.1",
     "leveldown": "*",
     "levelup": "*",
     "nexus-api": "Nexus-Mods/node-nexus-api",

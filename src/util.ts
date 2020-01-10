@@ -1,7 +1,7 @@
 import { IHashResult } from './types';
 
 import * as Promise from 'bluebird';
-import * as fs from 'fs-extra-promise';
+import * as fs from 'fs';
 
 /**
  * generate a hash of the specified file using the same hash

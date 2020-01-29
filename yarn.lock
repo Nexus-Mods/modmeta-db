@@ -2,6 +2,14 @@
 # yarn lockfile v1
 
 
+"@nexusmods/nexus-api@^1.0.5":
+  version "1.0.5"
+  resolved "https://registry.yarnpkg.com/@nexusmods/nexus-api/-/nexus-api-1.0.5.tgz#a5bd4434d10120d86e2760a5ea60c0e407d055d2"
+  integrity sha512-VRuoJfZt8FNI2whvkHoV8SmEtd4K/qeCMbrabJj82fbTLB6SIL/AKPimsep/2lCIQjYEpKrMteTLAfL6lRVyRw==
+  dependencies:
+    request "^2.85.0"
+    string-template "^1.0.0"
+
 "@types/abstract-leveldown@*":
   version "5.0.1"
   resolved "https://registry.yarnpkg.com/@types/abstract-leveldown/-/abstract-leveldown-5.0.1.tgz#3c7750d0186b954c7f2d2f6acc8c3c7ba0c3412e"
@@ -597,13 +605,6 @@ napi-macros@~1.8.1:
   version "1.8.2"
   resolved "https://registry.yarnpkg.com/napi-macros/-/napi-macros-1.8.2.tgz#299265c1d8aa401351ad0675107d751228c03eda"
   integrity sha512-Tr0DNY4RzTaBG2W2m3l7ZtFuJChTH6VZhXVhkGGjF/4cZTt+i8GcM9ozD+30Lmr4mDoZ5Xx34t2o4GJqYWDGcg==
-
-nexus-api@Nexus-Mods/node-nexus-api:
-  version "1.0.2"
-  resolved "https://codeload.github.com/Nexus-Mods/node-nexus-api/tar.gz/d640d7e1924fd3b755e3301dc98c3d3b69d89cfa"
-  dependencies:
-    request "^2.85.0"
-    string-template "^1.0.0"
 
 node-gyp-build@~4.1.0:
   version "4.1.0"

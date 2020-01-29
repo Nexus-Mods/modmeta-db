@@ -1,6 +1,6 @@
 {
   "name": "modmeta-db",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Serves dependencies and other meta information for mod files.",
   "main": "lib/index.js",
   "scripts": {
@@ -25,6 +25,7 @@
     "semver": "^6.2.0"
   },
   "devDependencies": {
+    "@nexusmods/nexus-api": "^1.0.5",
     "@types/bluebird": "3.5.19",
     "@types/body-parser": "^1.16.3",
     "@types/express": "^4.0.34",
@@ -37,7 +38,6 @@
     "encoding-down": "*",
     "leveldown": "*",
     "levelup": "*",
-    "nexus-api": "Nexus-Mods/node-nexus-api",
     "ts-node": "^3.0.2",
     "typescript": "^3.0.1"
   },

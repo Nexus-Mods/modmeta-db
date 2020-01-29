@@ -6,7 +6,7 @@ import * as encode from 'encoding-down';
 import * as http from 'http';
 import * as https from 'https';
 import * as leveldown from 'leveldown';
-import { NexusError, IMD5Result } from 'nexus-api';
+import { NexusError, IMD5Result } from '@nexusmods/nexus-api';
 import * as path from 'path';
 import * as semver from 'semver';
 import * as url from 'url';

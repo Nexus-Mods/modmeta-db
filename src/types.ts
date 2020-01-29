@@ -1,4 +1,4 @@
-import Nexus from 'nexus-api';
+import Nexus from '@nexusmods/nexus-api';
 
 /**
  * reference to a mod file.

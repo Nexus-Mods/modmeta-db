@@ -1,4 +1,4 @@
-import Nexus from 'nexus-api';
+import Nexus from '@nexusmods/nexus-api';
 export interface IReference {
     fileMD5?: string;
     fileSize?: number;

@@ -332,7 +332,7 @@ class ModDB {
               fileVersion: '',
               gameId,
               sourceURI: '',
-              expires: params.EXPIRE_INVALID_SEC,
+              expires: Date.now() + params.EXPIRE_INVALID_SEC,
             }]);
           }
         });

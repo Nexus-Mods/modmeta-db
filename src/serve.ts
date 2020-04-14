@@ -40,6 +40,12 @@ export function serveREST(db: ModDB, portIn?: number) {
             .then(() => { res.json({result: 'OK'}); })
             .catch((err) => res.send(err));
       });
+  router.route('/list')
+      .get((req, res) => {
+        db.list()
+          .then((output) => { res.json(output); })
+          .catch((err) => res.send(err));
+      });
 
   app.use(bodyParser.urlencoded({extended: true}));
   app.use(bodyParser.json());

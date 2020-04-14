@@ -283,6 +283,23 @@ class ModDB {
     }
   }
 
+  public list(): Promise<any> {
+    return new Promise((resolve, reject) => {
+      let result = {};
+      this.mDB.createReadStream()
+        .on('data', (data: { key: string, value: string }) => {
+          try {
+            result[data.key] = data.value;
+          } catch (err) {
+            this.mLog('warn', 'Invalid data stored for', data.key);
+          }
+        })
+        .on('error', (err) => reject(err))
+        .on('end', () => resolve(result));
+
+    })
+  }
+
   /**
    * look up the meta information for the mod identified by the
    * parameters.
@@ -423,7 +440,7 @@ class ModDB {
   }
 
   private queryServerHashMeta(server: IServer, hash: string): Promise<ILookupResult[]> {
-    const url = `${server.url}/by_hash/${hash}`;
+    const url = `${server.url}/by_key/${hash}`;
     return this.restGet(url);
   }
 

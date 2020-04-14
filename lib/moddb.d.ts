@@ -24,6 +24,7 @@ declare class ModDB {
     getByLogicalName(logicalName: string, versionMatch: string): Promise<ILookupResult[]>;
     getByExpression(expression: string, versionMatch: string): Promise<ILookupResult[]>;
     insert(mods: IModInfo[]): Promise<void>;
+    list(): Promise<any>;
     lookup(filePath?: string, fileMD5?: string, fileSize?: number, gameId?: string): Promise<ILookupResult[]>;
     private restGet;
     private queryServerLogical;

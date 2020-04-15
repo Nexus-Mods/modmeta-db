@@ -275,8 +275,11 @@ class ModDB {
         this.putSafe(key, JSON.stringify(groups[key]))
           .then(() => Promise.map(groups[key], mod =>
             this.putSafe(this.makeNameLookup(mod), key)))
-          .then(() => Promise.map(groups[key], mod =>
-            this.putSafe(this.makeLogicalLookup(mod), key))))
+          .then(() => Promise.map(groups[key], mod => {
+            return (mod.logicalFileName !== undefined)
+              ? this.putSafe(this.makeLogicalLookup(mod), key)
+              : Promise.resolve();
+          })))
         .then(() => null);
     } catch (err) {
       return Promise.reject(err);

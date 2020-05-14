@@ -38,7 +38,8 @@ export function serveREST(db: ModDB, portIn?: number) {
       .post((req, res) => {
         db.insert(req.body)
             .then(() => { res.json({result: 'OK'}); })
-            .catch((err) => res.send(err));
+            .catch((err) =>
+              res.json({ result: 'FAILED', error: err.message }));
       });
   router.route('/list')
       .get((req, res) => {

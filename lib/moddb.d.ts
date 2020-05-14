@@ -28,6 +28,7 @@ declare class ModDB {
     lookup(filePath?: string, fileMD5?: string, fileSize?: number, gameId?: string): Promise<ILookupResult[]>;
     private restGet;
     private queryServerLogical;
+    private queryServerExpression;
     private queryServerHash;
     private queryServerHashNexus;
     private queryServerHashMeta;

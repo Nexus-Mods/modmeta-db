@@ -122,7 +122,6 @@ class ModDB {
     this.mModKeys = [
       'fileName',
       'fileVersion',
-      'fileMD5',
       'fileSizeBytes',
       'sourceURI',
       'gameId',
@@ -264,10 +263,27 @@ class ModDB {
           throw new Error('Invalid mod object. Missing keys: ' +
             missingKeys.join(', '));
         }
+
+        // we allow entries to be created without md5 hash, they can still be looked
+        // up via logicalFileName or fileExpression. But we need something for the md5
+        // hash because the other tables are referencing the md5 lookup table
+        if (mod.fileMD5 === undefined) {
+          const { createHash } = require('crypto');
+          const hash = createHash('md5');
+          let size = 0;
+          hash.update(mod.fileName);
+          mod.fileMD5 = hash.digest('hex');
+        }
+
         const key = this.makeKey(mod);
         if (prev[key] === undefined) {
           prev[key] = [];
         }
+
+        if (mod.expires === undefined) {
+          mod.expires = Date.now() + params.EXPIRE_INVALID_SEC;
+        }
+
         prev[key].push(mod);
         return prev;
       }, {});
@@ -409,6 +425,17 @@ class ModDB {
     }
 
     const url = `${server.url}/by_name/${logicalName}/${versionMatch}`;
+    return this.restGet(url);
+  }
+
+  private queryServerExpression(server: IServer, expression: string,
+                                versionMatch: string): Promise<ILookupResult[]> {
+    if (server.nexus !== undefined) {
+      // not supported
+      return Promise.resolve([]);
+    }
+
+    const url = `${server.url}/by_expression/${expression}/${versionMatch}`;
     return this.restGet(url);
   }
 
@@ -611,6 +638,7 @@ class ModDB {
           results = results.filter(result =>
             (gameId === undefined) || result.key.split(':')[3] === gameId);
 
+          let preExpire = [...results];
           if (this.expireResults(results)) {
             results = [];
           }
@@ -641,7 +669,15 @@ class ModDB {
                   this.mBlacklist.add(JSON.stringify({ key, gameId }));
                 });
           })
-          .then(() => Promise.resolve(remoteResults || []));
+          .then(() => {
+            if ((remoteResults !== undefined) && (remoteResults.length > 0)) {
+              return remoteResults;
+            } else {
+              // if the servers didn't return anything, use even expired results
+              // over returning nothing
+              return preExpire;
+            }
+          });
         });
   }
 
@@ -690,7 +726,7 @@ class ModDB {
         let remoteResults: ILookupResult[];
 
         return Promise.mapSeries(this.mServers, (server: IServer) => {
-          if (remoteResults) {
+          if (remoteResults && (remoteResults.length > 0)) {
             return Promise.resolve();
           }
           return this.queryServerLogical(server, logicalName, versionMatch)
@@ -734,10 +770,10 @@ class ModDB {
           let remoteResults: ILookupResult[];
 
           return Promise.mapSeries(this.mServers, (server: IServer) => {
-            if (remoteResults) {
+            if (remoteResults && (remoteResults.length > 0)) {
               return Promise.resolve();
             }
-            return this.queryServerLogical(server, expression, versionMatch)
+            return this.queryServerExpression(server, expression, versionMatch)
                 .then((serverResults: ILookupResult[]) => {
                   remoteResults = serverResults;
                   return this.cacheResults(remoteResults, server.cacheDurationSec);

@@ -31,8 +31,11 @@ import Nexus from '@nexusmods/nexus-api';
  *                     mentioned.
  * In the same way you can use >, <, <=
  * You can combine multiple rules, like ">=1.2.1 <=1.3.6" to match the newest
- * file in the specified range.
+ * file in the specified range (greater or equal to 1.2.1 and less or equal to 1.3.6).
  * "1.2.1 - 1.3.6" would have the same effect.
+ * If you want to match anything _outside_ a range you can use the || operator,
+ * so <1.2.1 || >1.3.6 would match any version less than 1.2.1 or greater than 1.3.6,
+ * so that's everything *except* 1.2.1 - 1.3.6.
  *
  * Also you can use "1.x" to match the newest file with major version 1.
  * Or "~1.2.1" which would be the same as ">=1.2.1 <1.3.0".

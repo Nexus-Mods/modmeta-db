@@ -15,7 +15,7 @@ declare class ModDB {
     private mExpireHour;
     static create(dbName: string, gameId: string, servers: IServer[], log?: LogFunc, database?: any, timeoutMS?: number): Promise<ModDB>;
     constructor(gameId: string, servers: IServer[], log?: LogFunc, timeoutMS?: number);
-    connect(dbName: string, database: any): Promise<void>;
+    connect(dbName: string, database: any, attemptRepair?: boolean): Promise<void>;
     close(): Promise<void>;
     addServer(server: IServer): void;
     setGameId(gameId: string): void;
@@ -26,6 +26,7 @@ declare class ModDB {
     insert(mods: IModInfo[]): Promise<void>;
     list(): Promise<any>;
     lookup(filePath?: string, fileMD5?: string, fileSize?: number, gameId?: string): Promise<ILookupResult[]>;
+    private repairDB;
     private restGet;
     private queryServerLogical;
     private queryServerExpression;

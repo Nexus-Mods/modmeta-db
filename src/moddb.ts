@@ -5,7 +5,7 @@ import * as minimatch from 'minimatch';
 import * as encode from 'encoding-down';
 import * as http from 'http';
 import * as https from 'https';
-import * as leveldown from 'leveldown';
+import leveldown from 'leveldown';
 import { NexusError, IMD5Result } from '@nexusmods/nexus-api';
 import * as path from 'path';
 import * as semver from 'semver';
@@ -100,7 +100,7 @@ class ModDB {
               database?: any,
               timeoutMS?: number): Promise<ModDB> {
     const res = new ModDB(gameId, servers, log, timeoutMS);
-    return res.connect(dbName, database || encode((leveldown as any)(dbName)))
+    return res.connect(dbName, database || encode(leveldown(dbName)))
       .then(() => res);
   }
 
@@ -133,7 +133,7 @@ class ModDB {
     this.mLog = log || (() => undefined);
   }
 
-  public connect(dbName: string, database: any): Promise<void> {
+  public connect(dbName: string, database: any, attemptRepair: boolean = true): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       this.mDB = (levelup as any)(database, {keyEncoding: 'utf8', valueEncoding: 'utf8'}, (err, db) => {
         if (err) {
@@ -146,6 +146,14 @@ class ModDB {
     })
     .then(() => {
       this.promisify();
+    })
+    .catch(err => {
+      if (attemptRepair) {
+        return this.repairDB(dbName)
+          .then(() => this.connect(dbName, database, false));
+      } else {
+        return Promise.reject(err);
+      }
     });
   }
 
@@ -372,6 +380,18 @@ class ModDB {
             }]);
           }
         });
+    });
+  }
+
+  private repairDB(dbPath: string): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      leveldown.repair(dbPath, (err: Error) => {
+        if (err !== null) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
     });
   }
 

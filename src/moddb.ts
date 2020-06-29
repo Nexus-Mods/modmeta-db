@@ -444,7 +444,7 @@ class ModDB {
       return Promise.resolve([]);
     }
 
-    const url = `${server.url}/by_name/${logicalName}/${versionMatch}`;
+    const url = `${server.url.endsWith('/') ? server.url : server.url + "/"}by_name/${logicalName}/${versionMatch}`;
     return this.restGet(url);
   }
 
@@ -455,7 +455,7 @@ class ModDB {
       return Promise.resolve([]);
     }
 
-    const url = `${server.url}/by_expression/${expression}/${versionMatch}`;
+    const url = `${server.url.endsWith('/') ? server.url : server.url + "/"}/by_expression/${expression}/${versionMatch}`;
     return this.restGet(url);
   }
 
@@ -490,7 +490,7 @@ class ModDB {
   }
 
   private queryServerHashMeta(server: IServer, hash: string): Promise<ILookupResult[]> {
-    const url = `${server.url}/by_key/${hash}`;
+    const url = `${server.url.endsWith('/') ? server.url : server.url + "/"}/by_key/${hash}`;
     return this.restGet(url);
   }
 

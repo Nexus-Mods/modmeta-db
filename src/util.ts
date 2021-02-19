@@ -12,26 +12,30 @@ import * as fs from 'fs';
  *
  * @memberOf ModDB
  */
-export function genHash(filePath: string): Promise<IHashResult> {
-  return new Promise<IHashResult>((resolve, reject) => {
-    try {
-      const { createHash } = require('crypto');
-      const hash = createHash('md5');
-      let size = 0;
-      const stream = fs.createReadStream(filePath);
-      stream.on('data', (data) => {
-        hash.update(data);
-        size += data.length;
-      });
-      stream.on('end', () => resolve({
-                         md5sum: hash.digest('hex'),
-                         numBytes: size,
-                       }));
-      stream.on('error', (err) => {
+export function genHash(filePath: string,
+                        onProgress?: (read: number, total: number) => void)
+                        : Promise<IHashResult> {
+  return Promise.resolve(fs.promises.stat(filePath))
+    .then(stats => new Promise<IHashResult>((resolve, reject) => {
+      try {
+        const { createHash } = require('crypto');
+        const hash = createHash('md5');
+        let size = 0;
+        const stream = fs.createReadStream(filePath);
+        stream.on('data', (data) => {
+          hash.update(data);
+          size += data.length;
+          onProgress?.(size, stats.size);
+        });
+        stream.on('end', () => resolve({
+          md5sum: hash.digest('hex'),
+          numBytes: size,
+        }));
+        stream.on('error', (err) => {
+          reject(err);
+        });
+      } catch (err) {
         reject(err);
-      });
-    } catch (err) {
-      reject(err);
-    }
-  });
+      }
+    }));
 }

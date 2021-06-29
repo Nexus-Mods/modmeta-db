@@ -6,11 +6,12 @@ import * as encode from 'encoding-down';
 import * as http from 'http';
 import * as https from 'https';
 import leveldown from 'leveldown';
-import { NexusError, IMD5Result } from '@nexusmods/nexus-api';
+import { IMD5Result, IFileHash, IFileHashQuery } from '@nexusmods/nexus-api';
 import * as path from 'path';
 import * as semver from 'semver';
 import * as url from 'url';
 
+import Debouncer from './Debouncer';
 import * as params from './parameters';
 import {IHashResult, IIndexResult, ILookupResult, IModInfo, IServer, IReference} from './types';
 import {genHash} from './util';
@@ -77,6 +78,45 @@ function isMD5Hash(input: string): boolean {
   return true;
 }
 
+interface IMD5Request {
+  checksum: string;
+  fileSize: number;
+  resolve: (info: ILookupResult[]) => void;
+  reject: (err: Error) => void;
+}
+
+const FILE_HASH_QUERY: IFileHashQuery = {
+  md5: true,
+  fileName: true,
+  fileSize: true,
+  modFileId: true,
+  modFile: {
+    date: true,
+    description: true,
+    fileId: true,
+    version: true,
+    game: {
+      domainName: true,
+    },
+    mod: {
+      author: true,
+      category: true,
+      description: true,
+      modCategory: {
+        id: true,
+      },
+      uploader: {
+        name: true,
+      },
+    },
+    modId: true,
+    owner: {
+      name: true,
+    },
+    name: true,
+  },
+}
+
 /**
  * The primary database interface.
  * This allows queries about meta information regarding a file and
@@ -92,6 +132,8 @@ class ModDB {
   private mLog: LogFunc;
   private mRemainingExpires: number = params.REFETCH_PER_HOUR;
   private mExpireHour: number = (new Date()).getHours();
+  private mNexusMD5Debouncer: Debouncer;
+  private mMD5Requests: IMD5Request[] = [];
 
   public static create(dbName: string,
               gameId: string,
@@ -130,6 +172,52 @@ class ModDB {
     this.mGameId = gameId;
     this.mServers = servers;
     this.mTimeout = timeoutMS;
+    this.mNexusMD5Debouncer = new Debouncer(() => {
+      const requests = this.mMD5Requests;
+      this.mMD5Requests = [];
+      const server = servers.find(iter => iter.nexus !== undefined);
+      if (server === undefined) {
+        // this should never happen, we wouldn't be here in the first place
+        const err = new Error('No nexus server configured');
+        requests.forEach(iter => iter.reject(err));
+        return;
+      }
+
+      if (requests.length === 0) {
+        return Promise.resolve();
+      }
+
+      return server.nexus.fileHashes(FILE_HASH_QUERY, requests.map(iter => iter.checksum))
+        .then(results => {
+          requests.forEach(req => {
+            const matches = results.data.filter(iter => iter.md5 === req.checksum);
+
+            if (matches.length > 0) {
+              req.resolve(matches.map(hash =>
+                this.translateFromGraphQL(hash.md5, req.fileSize || parseInt(hash.fileSize, 10),
+                                          hash, hash.modFile.game.domainName)));
+            } else {
+              const error = (results.errors ?? []).find(iter =>
+                iter.extensions?.parameter === req.checksum);
+              if (error !== undefined) {
+                const err = new Error(error.message);
+                err['code'] = error.extensions?.code;
+                req.reject(err);
+              } else {
+                // nothing found
+                req.resolve([]);
+              }
+            }
+          });
+        })
+        .catch(err => {
+          let forwardErr: Error = err;
+          if (err.statusCode === 521) {
+            forwardErr = new Error('API offline');
+          }
+          requests.forEach(req => req.reject(forwardErr));
+        });
+    }, params.BATCHED_REQUEST_TIME);
     this.mLog = log || (() => undefined);
   }
 
@@ -473,20 +561,10 @@ class ModDB {
 
   private queryServerHashNexus(server: IServer, gameId: string,
                                hash: string, size: number): Promise<ILookupResult[]> {
-    return Promise.resolve(server.nexus.getFileByMD5(hash, this.translateNexusGameId(gameId)))
-      .then(nexusData => nexusData
-        .map(nexusObj => this.translateFromNexus(hash, size, nexusObj, gameId)))
-      .catch(NexusError, err => {
-        if (err.statusCode === 521) {
-          return Promise.reject(new Error('API offline'));
-        } else if (err.statusCode === 404) {
-          return Promise.resolve([]);
-        } else {
-          // TODO not sure what data contains at this point. If the api is working
-          // correct it _should_ be a json object containing an error message
-          return Promise.reject(err);
-        }
-      });
+    return new Promise((resolve, reject) => {
+      this.mMD5Requests.push({ checksum: hash, fileSize: size, resolve, reject });
+      this.mNexusMD5Debouncer.schedule();
+    });
   }
 
   private queryServerHashMeta(server: IServer, hash: string): Promise<ILookupResult[]> {
@@ -550,6 +628,44 @@ class ModDB {
           homepage: page,
           modId: nexusObj.mod.mod_id.toString(),
           fileId: nexusObj.file_details.file_id.toString(),
+        },
+      },
+    };
+  }
+
+  private translateFromGraphQL = (hash: string, size: number, nexusObj: Partial<IFileHash>, gameId: string): ILookupResult => {
+    const realSize = size || parseInt(nexusObj.fileSize, 10);
+    const urlFragments = [
+      'nxm:/',
+      nexusObj.modFile.game.domainName,
+      'mods',
+      nexusObj.modFile.modId.toString(),
+      'files',
+      nexusObj.modFile.fileId.toString(),
+    ];
+
+    const page =
+      `https://www.nexusmods.com/${nexusObj.modFile.game.domainName}/mods/${nexusObj.modFile.modId}/`;
+    return {
+      key:
+        `hash:${hash}:${realSize}:${gameId}:`,
+      value: {
+        fileMD5: hash,
+        fileName: nexusObj.fileName,
+        fileSizeBytes: realSize,
+        logicalFileName: nexusObj.modFile.name,
+        fileVersion: svclean(nexusObj.modFile.version),
+        gameId,
+        domainName: nexusObj.modFile.game.domainName,
+        sourceURI: urlFragments.join('/'),
+        source: 'nexus',
+        details: {
+          category: nexusObj.modFile.mod.modCategory.id,
+          description: nexusObj.modFile.description,
+          author: nexusObj.modFile.owner.name,
+          homepage: page,
+          modId: nexusObj.modFile.modId.toString(),
+          fileId: nexusObj.modFileId.toString(),
         },
       },
     };

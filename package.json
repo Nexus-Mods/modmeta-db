@@ -1,6 +1,6 @@
 {
   "name": "modmeta-db",
-  "version": "0.7.0",
+  "version": "0.8.0-r1",
   "description": "Serves dependencies and other meta information for mod files.",
   "main": "lib/index.js",
   "scripts": {
@@ -25,7 +25,7 @@
     "semver": "^6.2.0"
   },
   "devDependencies": {
-    "@nexusmods/nexus-api": "^1.0.5",
+    "@nexusmods/nexus-api": "git+ssh://git@gitlab.nexdev.uk:vortex/node-nexus-api.git#mod-packs",
     "@types/bluebird": "3.5.19",
     "@types/body-parser": "^1.16.3",
     "@types/express": "^4.0.34",

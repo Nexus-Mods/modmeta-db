@@ -190,7 +190,10 @@ class ModDB {
       return server.nexus.fileHashes(FILE_HASH_QUERY, requests.map(iter => iter.checksum))
         .then(results => {
           requests.forEach(req => {
-            const matches = results.data.filter(iter => iter.md5 === req.checksum);
+            // we currently just ignore all results with no modFile associated, these are probably
+            // files that have been deteled
+            const matches = results.data
+              .filter(iter => (iter.md5 === req.checksum) && !!iter.modFile);
 
             if (matches.length > 0) {
               req.resolve(matches.map(hash =>

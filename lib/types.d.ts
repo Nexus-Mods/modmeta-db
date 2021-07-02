@@ -25,6 +25,7 @@ export interface IModInfo {
     source?: string;
     rules?: IRule[];
     expires?: number;
+    archived?: boolean;
     details?: {
         homepage?: string;
         category?: string;

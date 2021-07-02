@@ -95,6 +95,7 @@ const FILE_HASH_QUERY: IFileHashQuery = {
     description: true,
     fileId: true,
     version: true,
+    categoryId: true,
     game: {
       domainName: true,
     },
@@ -662,6 +663,7 @@ class ModDB {
         domainName: nexusObj.modFile.game.domainName,
         sourceURI: urlFragments.join('/'),
         source: 'nexus',
+        archived: nexusObj.modFile.categoryId === 7,
         details: {
           category: nexusObj.modFile.mod.modCategory.id,
           description: nexusObj.modFile.description,

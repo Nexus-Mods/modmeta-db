@@ -12,6 +12,11 @@ holds about a file.
  should be kept the same across all servers and should be the same as used by game-support
  extensions used by Vortex
  Example: 'skyrim'
+* domainName (string) - can be used to store a domain for the game as used by the underlying
+ repository (specifically Nexus but may be useful in other integrations). This may be necessary
+ because there may not be a 1:1 relation between gameid within the meta server network and the
+ backends (e.g. Skyrim VR is its own game in the meta server network but Nexus stores Skyrim VR
+ games together with Skyrim Special Edition)
 * logicalFileName (string, optional) - An abstract name that uniquely identifies all
  versions of the _same_ file.
  Assume you have a mod that replaces armors and it has different files for each armor
@@ -21,11 +26,18 @@ holds about a file.
  file references if it follows semantic versioning. Example: '5.1.0'
  To a degree non-semantic versions can be used as they are auto-converted, i.e.
  '5.1' -> '5.1.0', '5.05' -> '5.5.0'
+* fileMD5 (string) - the md5 hash (stored as a hex string) of the file
 * sourceURI (string) - An url where this file can be downloaded. If this is an
  http(s) link it should be a direct link, the manager will not follow 302 redirects
  or interpret webpages to allow for javascript/html redirections.
  For other protocols (i.e. nxm, magnet) support may be added to the mod manager,
  otherwise the link will be useless.
+* source (string) - identifies the backend repository we got the information from
+* expires (number) - unix timestamp after which this information should be considered outdated
+ and refetched
+* archived (boolean) - if true the file has been "archived" on the repository meaning it
+ is still accessible but if alternatives (other repositories, newer file versions) exist those
+ should be used.
 * details (dictionary) - a dictionary of further attributes of the file. all
  attributes herein are optional, as is their use inside the client.
 * rules: (list of Rule objects) - a list of dependency rules for this mod.

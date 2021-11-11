@@ -13,6 +13,7 @@ export interface IRule {
     reference: IReference;
     comment?: string;
 }
+export declare type ModInfoStatus = 'unpublished' | 'published' | 'hidden' | 'revoked';
 export interface IModInfo {
     fileName: string;
     fileSizeBytes: number;
@@ -26,6 +27,7 @@ export interface IModInfo {
     rules?: IRule[];
     expires?: number;
     archived?: boolean;
+    status?: ModInfoStatus;
     details?: {
         homepage?: string;
         category?: string;

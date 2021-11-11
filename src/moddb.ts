@@ -6,14 +6,14 @@ import * as encode from 'encoding-down';
 import * as http from 'http';
 import * as https from 'https';
 import leveldown from 'leveldown';
-import { IMD5Result, IFileHash, IFileHashQuery } from '@nexusmods/nexus-api';
+import { IMD5Result, IFileHash, IFileHashQuery, ModStatus } from '@nexusmods/nexus-api';
 import * as path from 'path';
 import * as semver from 'semver';
 import * as url from 'url';
 
 import Debouncer from './Debouncer';
 import * as params from './parameters';
-import {IHashResult, IIndexResult, ILookupResult, IModInfo, IServer, IReference} from './types';
+import {IHashResult, IIndexResult, ILookupResult, IModInfo, IServer, IReference, ModInfoStatus} from './types';
 import {genHash} from './util';
 
 interface ILevelUpAsync extends levelup.LevelUp {
@@ -103,6 +103,7 @@ const FILE_HASH_QUERY: IFileHashQuery = {
       author: true,
       category: true,
       description: true,
+      status: true,
       modCategory: {
         id: true,
       },
@@ -637,6 +638,24 @@ class ModDB {
     };
   }
 
+  private convertModStatus = (input: string): ModInfoStatus => {
+    switch (input) {
+      case 'under_moderation':
+      case 'removed':
+      case 'wastebinned':
+        return 'revoked';
+      case 'not_published':
+        return 'unpublished';
+      case 'hidden':
+        return 'hidden';
+      case 'publish_with_game':
+      case 'published':
+        return 'published';
+      default:
+        return undefined;
+    }
+  }
+
   private translateFromGraphQL = (hash: string, size: number, nexusObj: Partial<IFileHash>, gameId: string): ILookupResult => {
     const realSize = size || parseInt(nexusObj.fileSize, 10);
     const urlFragments = [
@@ -664,6 +683,7 @@ class ModDB {
         sourceURI: urlFragments.join('/'),
         source: 'nexus',
         archived: nexusObj.modFile.categoryId === 7,
+        status: this.convertModStatus(nexusObj.modFile.mod.status),
         details: {
           category: nexusObj.modFile.mod.modCategory.id,
           description: nexusObj.modFile.description,

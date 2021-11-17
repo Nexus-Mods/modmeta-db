@@ -36,6 +36,7 @@ declare class ModDB {
     private queryServerHashNexus;
     private queryServerHashMeta;
     private translateNexusGameId;
+    private gameIdFromNexusDomain;
     private translateFromNexus;
     private convertModStatus;
     private translateFromGraphQL;

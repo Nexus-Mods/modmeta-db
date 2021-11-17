@@ -198,9 +198,12 @@ class ModDB {
               .filter(iter => (iter.md5 === req.checksum) && !!iter.modFile);
 
             if (matches.length > 0) {
-              req.resolve(matches.map(hash =>
-                this.translateFromGraphQL(hash.md5, req.fileSize || parseInt(hash.fileSize, 10),
-                                          hash, hash.modFile.game.domainName)));
+              req.resolve(matches.map(hash => {
+                const fileSize = req.fileSize || parseInt(hash.fileSize, 10);
+                const resolvedGameId =
+                  this.gameIdFromNexusDomain(hash.modFile.game.domainName, gameId);
+                return this.translateFromGraphQL(hash.md5, fileSize, hash, resolvedGameId);
+              }));
             } else {
               const error = (results.errors ?? []).find(iter =>
                 iter.extensions?.parameter === req.checksum);
@@ -588,6 +591,22 @@ class ModDB {
       return 'elderscrollsonline';
     } else if ((input === 'nwn') || (input === 'nwnee')) {
       return 'neverwinter';
+    } else {
+      return input;
+    }
+  }
+
+  private gameIdFromNexusDomain(input: string, reqGameId: string): string {
+    if (input === 'skyrimspecialedition') {
+      return reqGameId === 'skyrimvr' ? 'skyrimvr' : 'skyrimse';
+    } else if (input === 'newvegas') {
+      return 'falloutnv';
+    } else if (input === 'fallout4') {
+      return reqGameId === 'fallout4vr' ? 'fallout4vr' : 'fallout4';
+    } else if (input === 'elderscrollsonline') {
+      return 'teso';
+    } else if (input === 'neverwinter') {
+      return reqGameId === 'nwnee' ? 'nwnee' : 'nwn';
     } else {
       return input;
     }

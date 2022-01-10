@@ -90,7 +90,7 @@ class Debouncer {
    *
    * @memberOf Debouncer
    */
-  public runNow(callback: (err: Error) => void, ...args: any[]) {
+  public runNow(callback?: (err: Error) => void, ...args: any[]) {
     if (this.mTimer !== undefined) {
       this.clear();
     }

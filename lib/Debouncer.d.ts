@@ -12,7 +12,7 @@ declare class Debouncer {
     private mRetrigger;
     constructor(func: (...args: any[]) => Error | PromiseLike<void>, debounceMS: number, reset?: boolean, triggerImmediately?: boolean);
     schedule(callback?: (err: Error) => void, ...args: any[]): void;
-    runNow(callback: (err: Error) => void, ...args: any[]): void;
+    runNow(callback?: (err: Error) => void, ...args: any[]): void;
     wait(callback: (err: Error) => void, immediately?: boolean): void;
     clear(): void;
     private run;

@@ -13,6 +13,8 @@ declare class ModDB {
     private mLog;
     private mRemainingExpires;
     private mExpireHour;
+    private mNexusMD5Debouncer;
+    private mMD5Requests;
     static create(dbName: string, gameId: string, servers: IServer[], log?: LogFunc, database?: any, timeoutMS?: number): Promise<ModDB>;
     constructor(gameId: string, servers: IServer[], log?: LogFunc, timeoutMS?: number);
     connect(dbName: string, database: any, attemptRepair?: boolean): Promise<void>;
@@ -34,7 +36,10 @@ declare class ModDB {
     private queryServerHashNexus;
     private queryServerHashMeta;
     private translateNexusGameId;
+    private gameIdFromNexusDomain;
     private translateFromNexus;
+    private convertModStatus;
+    private translateFromGraphQL;
     private readRange;
     private cacheResults;
     private expireResults;

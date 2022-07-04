@@ -98,6 +98,8 @@ export interface IRule {
   comment?: string;
 }
 
+export type ModInfoStatus = 'unpublished' | 'published' | 'hidden' | 'revoked';
+
 /**
  * info about a single file
  *
@@ -116,6 +118,8 @@ export interface IModInfo {
   source?: string;
   rules?: IRule[];
   expires?: number;
+  archived?: boolean;
+  status?: ModInfoStatus;
   details?: {
     homepage?: string;
     category?: string;

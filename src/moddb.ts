@@ -541,7 +541,7 @@ class ModDB {
     }
 
     const url = `${server.url.endsWith('/') ? server.url : server.url + "/"}by_name/${logicalName}/${versionMatch}`;
-    return this.restGet(url);
+    return [this.restGet(url)];
   }
 
   private queryServerExpression(server: IServer, expression: string,
@@ -552,7 +552,7 @@ class ModDB {
     }
 
     const url = `${server.url.endsWith('/') ? server.url : server.url + "/"}/by_expression/${expression}/${versionMatch}`;
-    return this.restGet(url);
+    return [this.restGet(url)];
   }
 
   private queryServerHash(server: IServer, gameId: string, hash: string, size: number): Promise<ILookupResult[]> {
@@ -577,7 +577,7 @@ class ModDB {
 
   private queryServerHashMeta(server: IServer, hash: string): Promise<ILookupResult[]> {
     const url = `${server.url.endsWith('/') ? server.url : server.url + "/"}/by_key/${hash}`;
-    return this.restGet(url);
+    return [this.restGet(url)];
   }
 
   private translateNexusGameId(input: string): string {

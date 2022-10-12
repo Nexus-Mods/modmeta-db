@@ -25,6 +25,7 @@ declare class ModDB {
     getByKey(key: string, gameId?: string): Promise<ILookupResult[]>;
     getByLogicalName(logicalName: string, versionMatch: string): Promise<ILookupResult[]>;
     getByExpression(expression: string, versionMatch: string): Promise<ILookupResult[]>;
+    private hashFileName;
     insert(mods: IModInfo[]): Promise<void>;
     list(): Promise<any>;
     lookup(filePath?: string, fileMD5?: string, fileSize?: number, gameId?: string): Promise<ILookupResult[]>;

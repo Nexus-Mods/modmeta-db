@@ -1,4 +1,5 @@
 import Nexus from '@nexusmods/nexus-api';
+import Bluebird = require('bluebird');
 
 /**
  * reference to a mod file.
@@ -152,8 +153,19 @@ export interface IHashResult {
   md5sum: string;
   numBytes: number;
 }
+
+export interface IQuery {
+  hash?: string;
+  expression?: string;
+  name?: string;
+  versionMatch?: string;
+  size?: number;
+}
+
 export interface IServer {
   nexus?: Nexus;
   url: string;
+  loopbackCB?: (query: IQuery) => Bluebird<ILookupResult[]>;
   cacheDurationSec: number;
+  priority?: number;
 }

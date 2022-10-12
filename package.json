@@ -1,6 +1,6 @@
 {
   "name": "modmeta-db",
-  "version": "0.8.0-r6",
+  "version": "0.9.0",
   "description": "Serves dependencies and other meta information for mod files.",
   "main": "lib/index.js",
   "scripts": {

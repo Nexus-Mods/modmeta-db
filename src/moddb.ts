@@ -350,6 +350,16 @@ class ModDB {
     return this.getAllByExpression(expression, versionMatch);
   }
 
+  private hashFileName(fileName: string): string {
+    if (fileName === undefined) {
+      return undefined;
+    }
+    const { createHash } = require('crypto');
+    const hash = createHash('md5');
+    hash.update(fileName);
+    return hash.digest('hex');
+  }
+
   /**
    * insert a mod into the database, potentially overwriting
    * existing data
@@ -361,6 +371,7 @@ class ModDB {
    */
   public insert(mods: IModInfo[]): Promise<void> {
     try {
+      const cleanup: Promise<void>[] = [];
       const groups: { [key: string]: IModInfo[] } = mods.reduce((prev, mod) => {
         const missingKeys = this.missingKeys(mod);
         if (missingKeys.length !== 0) {
@@ -371,12 +382,29 @@ class ModDB {
         // we allow entries to be created without md5 hash, they can still be looked
         // up via logicalFileName or fileExpression. But we need something for the md5
         // hash because the other tables are referencing the md5 lookup table
+
+        const nameHash = this.hashFileName(mod.fileName);
         if (mod.fileMD5 === undefined) {
-          const { createHash } = require('crypto');
-          const hash = createHash('md5');
-          let size = 0;
-          hash.update(mod.fileName);
-          mod.fileMD5 = hash.digest('hex');
+          mod.fileMD5 = nameHash;
+        } else if (nameHash !== undefined) {
+          // there is a chance that we previously added this same mod with an md5
+          // hash calculated on its file name
+          cleanup.push(this.getAllByKey(this.createKey(nameHash))
+            .then(results => {
+              const existing = results.find(res =>
+                (res.value.fileMD5 === nameHash) && (res.value.fileName === mod.fileName));
+              if (existing !== undefined) {
+                // indeed, there is an entry for the name hash.
+                // We can't drop that other entry because it may also use a different logical name
+                // It might be reasonable to update the lookups by name and logicalname to
+                // point to the new entry but I felt it was less intrusive to just fix the
+                // fileMD5 on the other entry.
+                return this.putSafe(existing.key, JSON.stringify({
+                  ...existing.value,
+                  fileMD5: mod.fileMD5,
+                }));
+              }
+            }));
         }
 
         const key = this.makeKey(mod);
@@ -391,15 +419,16 @@ class ModDB {
         prev[key].push(mod);
         return prev;
       }, {});
-      return Promise.map(Object.keys(groups), key =>
-        this.putSafe(key, JSON.stringify(groups[key]))
-          .then(() => Promise.map(groups[key], mod =>
-            this.putSafe(this.makeNameLookup(mod), key)))
-          .then(() => Promise.map(groups[key], mod => {
-            return (mod.logicalFileName !== undefined)
-              ? this.putSafe(this.makeLogicalLookup(mod), key)
-              : Promise.resolve();
-          })))
+      return Promise.all(cleanup)
+        .then(() => Promise.map(Object.keys(groups), key =>
+          this.putSafe(key, JSON.stringify(groups[key]))
+            .then(() => Promise.map(groups[key], mod =>
+              this.putSafe(this.makeNameLookup(mod), key)))
+            .then(() => Promise.map(groups[key], mod => {
+              return (mod.logicalFileName !== undefined)
+                ? this.putSafe(this.makeLogicalLookup(mod), key)
+                : Promise.resolve();
+            }))))
         .then(() => null);
     } catch (err) {
       return Promise.reject(err);
@@ -538,6 +567,8 @@ class ModDB {
     if (server.nexus !== undefined) {
       // not supported
       return Promise.resolve([]);
+    } else if (server.loopbackCB !== undefined) {
+      return server.loopbackCB({ name: logicalName, versionMatch });
     }
 
     const url = `${server.url.endsWith('/') ? server.url : server.url + "/"}by_name/${logicalName}/${versionMatch}`;
@@ -549,6 +580,8 @@ class ModDB {
     if (server.nexus !== undefined) {
       // not supported
       return Promise.resolve([]);
+    } else if (server.loopbackCB !== undefined) {
+      return server.loopbackCB({ expression, versionMatch });
     }
 
     const url = `${server.url.endsWith('/') ? server.url : server.url + "/"}/by_expression/${expression}/${versionMatch}`;
@@ -562,6 +595,8 @@ class ModDB {
     }
     if (server.nexus !== undefined) {
       return this.queryServerHashNexus(server, gameId, hash, size);
+    } else if (server.loopbackCB !== undefined) {
+      return server.loopbackCB({ hash, size });
     } else {
       return this.queryServerHashMeta(server, hash);
     }
@@ -832,6 +867,8 @@ class ModDB {
           const size = parseInt(keySplit[1], 10);
           let remoteResults: ILookupResult[];
 
+          let allInvalid: boolean = false;
+
           return Promise.mapSeries(this.mServers, (server: IServer) => {
             if (remoteResults && (remoteResults.length > 0)) {
               // only use the results from the first server that had anything
@@ -839,6 +876,7 @@ class ModDB {
             }
             return this.queryServerHash(server, gameId, hash, size)
                 .then((serverResults: ILookupResult[]) => {
+                  allInvalid = true;
                   remoteResults = serverResults;
                   return this.cacheResults(remoteResults, server.cacheDurationSec);
                 })
@@ -846,10 +884,12 @@ class ModDB {
                   this.mLog('warn', 'failed to query by key', {
                     server: server.url, key, gameId, error: err.message.toString(),
                   });
-                  this.mBlacklist.add(JSON.stringify({ key, gameId }));
                 });
           })
           .then(() => {
+            if (allInvalid) {
+              this.mBlacklist.add(JSON.stringify({ key, gameId }));
+            }
             if ((remoteResults !== undefined) && (remoteResults.length > 0)) {
               return remoteResults;
             } else {
@@ -969,7 +1009,7 @@ class ModDB {
         });
   }
 
-  private createKey(hash: string, size: number, gameId: string) {
+  private createKey(hash: string, size?: number, gameId?: string) {
     let lookupKey = `${hash}`;
     if (size !== undefined) {
       lookupKey += ':' + size;

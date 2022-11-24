@@ -864,10 +864,10 @@ class ModDB {
 
           const keySplit = key.split(':');
           const hash = keySplit[0];
-          const size = parseInt(keySplit[1], 10);
+          const size = keySplit.length > 1 ? parseInt(keySplit[1], 10) : 0;
           let remoteResults: ILookupResult[];
 
-          let allInvalid: boolean = false;
+          let allInvalid: boolean = true;
 
           return Promise.mapSeries(this.mServers, (server: IServer) => {
             if (remoteResults && (remoteResults.length > 0)) {
@@ -876,7 +876,7 @@ class ModDB {
             }
             return this.queryServerHash(server, gameId, hash, size)
                 .then((serverResults: ILookupResult[]) => {
-                  allInvalid = true;
+                  allInvalid = false;
                   remoteResults = serverResults;
                   return this.cacheResults(remoteResults, server.cacheDurationSec);
                 })

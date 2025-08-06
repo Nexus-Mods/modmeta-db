@@ -120,6 +120,7 @@ interface IMD5Request {
 // }
 
 const FILE_HASH_QUERY: IFileHashQuery = {
+  md5: true,
   fileName: true,
   fileSize: true,
   modFileId: true,

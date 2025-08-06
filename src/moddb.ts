@@ -85,13 +85,46 @@ interface IMD5Request {
   reject: (err: Error) => void;
 }
 
+// const FILE_HASH_QUERY: IFileHashQuery = {
+//   md5: true,
+//   fileName: true,
+//   fileSize: true,
+//   modFileId: true,
+//   modFile: {
+//     date: true,
+//     description: true,
+//     fileId: true,
+//     version: true,
+//     categoryId: true,
+//     game: {
+//       domainName: true,
+//     },
+//     mod: {
+//       author: true,
+//       category: true,
+//       description: true,
+//       status: true,
+//       modCategory: {
+//         id: true,
+//       },
+//       uploader: {
+//         name: true,
+//       },
+//     },
+//     modId: true,
+//     owner: {
+//       name: true,
+//     },
+//     name: true,
+//   },
+// }
+
 const FILE_HASH_QUERY: IFileHashQuery = {
   md5: true,
   fileName: true,
   fileSize: true,
   modFileId: true,
   modFile: {
-    date: true,
     description: true,
     fileId: true,
     version: true,
@@ -100,15 +133,9 @@ const FILE_HASH_QUERY: IFileHashQuery = {
       domainName: true,
     },
     mod: {
-      author: true,
-      category: true,
-      description: true,
       status: true,
       modCategory: {
         id: true,
-      },
-      uploader: {
-        name: true,
       },
     },
     modId: true,

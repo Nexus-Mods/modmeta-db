@@ -25,7 +25,7 @@
     "semver": "^6.2.0"
   },
   "devDependencies": {
-    "@nexusmods/nexus-api": "Nexus-Mods/node-nexus-api",
+    "@nexusmods/nexus-api": "Nexus-Mods/node-nexus-api#quota-modification",
     "@types/bluebird": "3.5.19",
     "@types/body-parser": "^1.16.3",
     "@types/express": "^4.0.34",

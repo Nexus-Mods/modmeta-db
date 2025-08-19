@@ -2,9 +2,9 @@
 # yarn lockfile v1
 
 
-"@nexusmods/nexus-api@Nexus-Mods/node-nexus-api":
-  version "1.4.26"
-  resolved "https://codeload.github.com/Nexus-Mods/node-nexus-api/tar.gz/85d47998d7cfb05ed289b6c2cc167b9646b27ab4"
+"@nexusmods/nexus-api@Nexus-Mods/node-nexus-api#quota-modification":
+  version "1.4.27"
+  resolved "https://codeload.github.com/Nexus-Mods/node-nexus-api/tar.gz/1f3c2aea7068cd4f4ff00ca8ea7756c8b7d423ba"
   dependencies:
     form-data "^4.0.0"
     jsonwebtoken "^9.0.0"

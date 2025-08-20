@@ -215,36 +215,50 @@ class ModDB {
       if (requests.length === 0) {
         return Promise.resolve();
       }
-
-      return server.nexus.fileHashes(FILE_HASH_QUERY, requests.map(iter => iter.checksum))
-        .then(results => {
-          return Promise.all(requests.map(req => {
-            // we currently just ignore all results with no modFile associated, these are probably
-            // files that have been deteled
-            const matches = results.data
-              .filter(iter => (iter.md5 === req.checksum) && !!iter.modFile);
-
-            if (matches.length > 0) {
-              req.resolve(matches.map(hash => {
-                const fileSize = req.fileSize || parseInt(hash.fileSize, 10);
-                const resolvedGameId = this.gameIdFromNexusDomain(hash.modFile.game.domainName, gameId);
-                const entry = this.translateFromGraphQL(hash.md5, fileSize, hash, resolvedGameId);
-                this.cacheResults([entry], server.cacheDurationSec);
-                return entry;
-              }));
+      // Try to resolve using the db first.
+      const dbPromises = Promise.all(requests.map(req => {
+        return this.getAllByKey(this.createKey(req.checksum, req.fileSize, this.mGameId))
+          .then(results => {
+            if (results.length > 0) {
+              req.resolve(results);
+              return null
             } else {
-              const error = (results.errors ?? []).find(iter =>
-                iter.extensions?.parameter === req.checksum);
-              if (error !== undefined) {
-                const err = new Error(error.message);
-                err['code'] = error.extensions?.code;
-                req.reject(err);
-              } else {
-                // nothing found
-                req.resolve([]);
-              }
+              return req;
             }
-          }));
+          });
+      }));
+      return dbPromises.then((missingHashes) => {
+        const filtered = missingHashes.filter(iter => iter !== null);
+        server.nexus.fileHashes(FILE_HASH_QUERY, filtered.map(iter => iter.checksum))
+          .then(results => {
+            return Promise.all(filtered.map(req => {
+              // we currently just ignore all results with no modFile associated, these are probably
+              // files that have been deteled
+              const matches = results.data
+                .filter(iter => (iter.md5 === req.checksum) && !!iter.modFile);
+
+              if (matches.length > 0) {
+                req.resolve(matches.map(hash => {
+                  const fileSize = req.fileSize || parseInt(hash.fileSize, 10);
+                  const resolvedGameId = this.gameIdFromNexusDomain(hash.modFile.game.domainName, gameId);
+                  const entry = this.translateFromGraphQL(hash.md5, fileSize, hash, resolvedGameId);
+                  this.cacheResults([entry], server.cacheDurationSec);
+                  return entry;
+                }));
+              } else {
+                const error = (results.errors ?? []).find(iter =>
+                  iter.extensions?.parameter === req.checksum);
+                if (error !== undefined) {
+                  const err = new Error(error.message);
+                  err['code'] = error.extensions?.code;
+                  req.reject(err);
+                } else {
+                  // nothing found
+                  req.resolve([]);
+                }
+              }
+            }));
+          })
         })
         .then(() => {}) // Ensure return type is Promise<void>
         .catch(err => {

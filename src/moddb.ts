@@ -209,7 +209,7 @@ class ModDB {
         // this should never happen, we wouldn't be here in the first place
         const err = new Error('No nexus server configured');
         requests.forEach(iter => iter.reject(err));
-        return;
+        return Promise.resolve();
       }
 
       if (requests.length === 0) {
@@ -218,7 +218,7 @@ class ModDB {
 
       return server.nexus.fileHashes(FILE_HASH_QUERY, requests.map(iter => iter.checksum))
         .then(results => {
-          requests.forEach(req => {
+          return Promise.all(requests.map(req => {
             // we currently just ignore all results with no modFile associated, these are probably
             // files that have been deteled
             const matches = results.data
@@ -227,9 +227,10 @@ class ModDB {
             if (matches.length > 0) {
               req.resolve(matches.map(hash => {
                 const fileSize = req.fileSize || parseInt(hash.fileSize, 10);
-                const resolvedGameId =
-                  this.gameIdFromNexusDomain(hash.modFile.game.domainName, gameId);
-                return this.translateFromGraphQL(hash.md5, fileSize, hash, resolvedGameId);
+                const resolvedGameId = this.gameIdFromNexusDomain(hash.modFile.game.domainName, gameId);
+                const entry = this.translateFromGraphQL(hash.md5, fileSize, hash, resolvedGameId);
+                this.insert([entry.value]);
+                return entry;
               }));
             } else {
               const error = (results.errors ?? []).find(iter =>
@@ -243,8 +244,9 @@ class ModDB {
                 req.resolve([]);
               }
             }
-          });
+          }));
         })
+        .then(() => {}) // Ensure return type is Promise<void>
         .catch(err => {
           let forwardErr: Error = err;
           if (err.statusCode === 521) {

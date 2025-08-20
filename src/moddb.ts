@@ -229,6 +229,10 @@ class ModDB {
       }));
       return dbPromises.then((missingHashes) => {
         const filtered = missingHashes.filter(iter => iter !== null);
+        if (filtered.length === 0) {
+          // We managed to find all the hashes in the db, can skip the fileHashes call
+          return Promise.resolve();
+        }
         server.nexus.fileHashes(FILE_HASH_QUERY, filtered.map(iter => iter.checksum))
           .then(results => {
             return Promise.all(filtered.map(req => {

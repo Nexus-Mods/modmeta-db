@@ -923,6 +923,9 @@ class ModDB {
             }
             return this.queryServerHash(server, gameId, hash, size)
                 .then((serverResults: ILookupResult[]) => {
+                  if (serverResults.length === 0) {
+                    return Promise.resolve();
+                  }
                   allInvalid = false;
                   remoteResults = serverResults;
                   return this.cacheResults(remoteResults, server.cacheDurationSec);

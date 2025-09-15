@@ -6,4 +6,4 @@ export const REFETCH_PER_HOUR: number = 10;
 
 // time (in ms) we delay queries to the nexus api to see if we can batch multiple queries
 // in one request
-export const BATCHED_REQUEST_TIME: number = 500;
+export const BATCHED_REQUEST_TIME: number = 50;
